@@ -9,11 +9,13 @@
 
 Matheus Vinicius Mariussi | MatheusVMariussi
 
-### Instruções de compilação, execução e testes
+# Instruções de compilação, execução e testes
 
-Instrucao 1
-Instrucao 2
-...
+Rodar o programa em si
+python main.py <arquivo_de_teste>
+
+Rodar testes do analisador lexico
+python main.py --test
 
 
 ### Checklist Final de Entrega
