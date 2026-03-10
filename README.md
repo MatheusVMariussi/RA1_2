@@ -6,6 +6,7 @@
 **Professor: Frank Coelho de Alcantara**
 
 **Integrantes: (Nome | Github)**
+
 Matheus Vinicius Mariussi | MatheusVMariussi
 
 ### Instruções de compilação, execução e testes
