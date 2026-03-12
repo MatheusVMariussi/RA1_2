@@ -1,7 +1,7 @@
 # Trabalho RA1, Grupo 2
 # Alunos: (Deixar em ordem alfabética)
-# - Matheus Vinius Mariussi, MatheusVMariussi
 # - Jorge Samuel Teixeira Jordão, JorgeSTJordao
+# - Matheus Vinius Mariussi, MatheusVMariussi
 # - Nome do Aluno 3, Nome do github 3
 # - Nome do Aluno 4, Nome do github 4
 
