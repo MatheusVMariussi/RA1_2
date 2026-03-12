@@ -8,6 +8,7 @@
 **Integrantes: (Nome | Github)**
 
 Matheus Vinicius Mariussi | MatheusVMariussi
+Jorge Samuel Teixeira Jordão | JorgeSTJordao
 
 # Instruções de compilação, execução e testes
 
