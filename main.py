@@ -2,7 +2,7 @@
 # Alunos: (Deixar em ordem alfabética)
 # - Jorge Samuel Teixeira Jordão, JorgeSTJordao
 # - Matheus Vinius Mariussi, MatheusVMariussi
-# - Nome do Aluno 3, Nome do github 3
+# - Pedro Henrique Vargas Navarro, Navarro45
 # - Nome do Aluno 4, Nome do github 4
 
 import sys
@@ -11,8 +11,13 @@ from testesAnalisadorLexico import testar_analisador_lexico
 # TODO (serão implementados pelos outros membros do grupo)
 
 def lerArquivo(nomeArquivo):
-    # Retorna: list[str] — cada string é uma linha do arquivo
-    pass
+    linhas = []
+
+    with open(nomeArquivo, "r", encoding="utf-8") as arquivo:
+        for linha in arquivo:
+            linhas.append(linha.strip())
+
+    return linhas
 
 def executarExpressao(tokens, resultados, memoria):
     # Avalia a expressão RPN representada por tokens
