@@ -9,6 +9,7 @@
 
 Matheus Vinicius Mariussi | MatheusVMariussi
 Jorge Samuel Teixeira Jordão | JorgeSTJordao
+Pedro Henrique Vargas Navarro | Navarro45
 
 # Instruções de compilação, execução e testes
 
