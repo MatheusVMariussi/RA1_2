@@ -8,6 +8,7 @@
 import sys
 from testesAnalisadorLexico import testar_analisador_lexico
 from testesExecutarExpressao import testar_executar_expressao
+from maquinaDeEstados import parseExpressao
 
 # TODO (serão implementados pelos outros membros do grupo)
 
@@ -20,8 +21,8 @@ def gerarAssembly(todas_linhas_tokens, codigoAssembly):
     pass
 
 def exibirResultados(resultados):
-    # Exibe os resultados formatados no console
-    pass
+    for resultado in resultados:
+        print(f"O resultado é {resultado}!")
 
 
 # main
@@ -42,6 +43,9 @@ def main():
         sys.exit(1)
 
     nome_arquivo = sys.argv[1]
+    linhas_expressoes = lerArquivo(nomeArquivo=nome_arquivo)
+    for linha in linhas_expressoes:
+        parseExpressao(linha=linha, )
     print(f"Arquivo: {nome_arquivo}")
     print("(Integração completa será feita quando todas as partes estiverem prontas)")
 
