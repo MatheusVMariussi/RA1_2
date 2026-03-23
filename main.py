@@ -8,6 +8,7 @@
 import sys
 import re
 from testesAnalisadorLexico import testar_analisador_lexico
+from testesExecutarExpressao import testar_executar_expressao
 
 # TODO (serão implementados pelos outros membros do grupo)
 
@@ -539,7 +540,6 @@ def main():
 
     # Se chamado com --test-expr, roda os testes de execução de expressões
     if len(sys.argv) == 2 and sys.argv[1] == "--test-expr":
-        from testesExecutarExpressao import testar_executar_expressao
         testar_executar_expressao()
         return
 
