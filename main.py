@@ -80,19 +80,6 @@ def executarExpressao(tokens, resultados, memoria):
 """
 Gerador de código Assembly ARMv7 para expressões RPN.
 Compatível com CPUlator ARMv7 DE1-SoC (Cortex-A9, neon-fp16, softfp).
- 
-Correções aplicadas em relação à versão anterior:
-  1. VCVT double→int: usa VCVT.S32.F64 com s-reg de destino (não d-reg).
-     O par de registradores s é obtido de d via: d0 → s0/s1, d1 → s2/s3, etc.
-     Fórmula: d N → s(2N)  para a metade baixa (que recebe o inteiro).
-  2. VMOV reg-int ← VFP: usa VMOV r, s  (s-reg → r-reg), não VMOV r, d.
-  3. DIV inteiro: Cortex-A9 em modo ARM não suporta SDIV/UDIV.
-     Implementado via FPU: converte para double, divide, trunca de volta.
-  4. Módulo (%): mesmo princípio — calcula via VDIV.F64 + VCVT truncado.
- 
-Mapeamento seven segment display (DE1-SoC):
-  0xFF200020 → HEX3(bits30:24) | HEX2(bits22:16) | HEX1(bits14:8) | HEX0(bits6:0)
-  0xFF200030 → HEX5(bits14:8) | HEX4(bits6:0)
 """
  
 import re
@@ -121,9 +108,9 @@ def gerarAssembly(tokens: list[str]) -> str:
     const_pool = {}
     mem_vars   = set()
     label_n    = [0]
-    dreg_n     = [0]   # registradores d0-d15 (double, 64 bits)
-    # Registradores inteiros r0-r10 reservados para a expressão.
-    # r11-r12 reservados para a rotina de display (não colidem).
+    dreg_n     = [0]    # registradores d0-d15 (double, 64 bits)
+                        # Registradores inteiros r0-r10 reservados para a expressão.
+                        # r11-r12 reservados para a rotina de display (não colidem).
     ireg_n     = [0]
  
     # ------------------------------------------------------------------
