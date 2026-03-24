@@ -10,6 +10,7 @@ import re
 from testesAnalisadorLexico import testar_analisador_lexico
 from testesExecutarExpressao import testar_executar_expressao, executarExpressao
 from maquinaDeEstados import parseExpressao
+from token_class import salvar_tokens
 
 # TODO (serão implementados pelos outros membros do grupo)
 
@@ -43,14 +44,16 @@ _TIPOS_VALOR_DIRETO = {"NUMBER", "MEM_NAME"}
  
 # Tipos Token que mapeiam para um operador fixo
 _MAPA_TIPO = {
-    "KW_RES":  "RES",
+    "KEYWORD_RES":  "RES",
     "OP_ADD":  "+",
     "OP_SUB":  "-",
     "OP_MUL":  "*",
     "OP_DIV":  "/",
     "OP_POW":  "^",
-    "OP_IDIV": "//",
+    "OP_INTDIV": "//",
     "OP_MOD":  "%",
+    "LPAREN": "(",
+    "RPAREN": ")",
 }
 
 def _token_para_str(tok) -> str:
@@ -617,13 +620,14 @@ def main():
         sys.exit(1)
 
     nome_arquivo = sys.argv[1]
-    expressoes = []
+    tokens = []
     print(f"Arquivo: {nome_arquivo}")
     linhas_expressoes = lerArquivo(nomeArquivo=nome_arquivo)
     for linha in linhas_expressoes:
-        expressoes = (parseExpressao(linha=linha, tokens=expressoes))
-    resultados = executarExpressao(tokens=expressoes, resultados=[], memoria={})
-    gerarAssembly(expressoes)
+        tokens = (parseExpressao(linha=linha, tokens=tokens))
+    resultados = executarExpressao(tokens=tokens, resultados=[], memoria={})
+    salvar_tokens(todas_linhas_tokens=tokens, nome_arquivo_fonte="resultados/tokens.txt")
+    gerarAssembly(tokens)
     exibirResultados(resultados=resultados)
     print("Expressão finalizada")
 
