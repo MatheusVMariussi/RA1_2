@@ -33,6 +33,71 @@ import re
 SEG7_DIGITS = [0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F]
 SEG7_BLANK  = 0x00
 SEG7_MINUS  = 0x40
+
+# ---------------------------------------------------------------------------
+# Conversão Token → str  (chamada antes do loop principal)
+# ---------------------------------------------------------------------------
+ 
+# Tipos Token cujo .valor é usado diretamente como string
+_TIPOS_VALOR_DIRETO = {"NUMBER", "MEM_NAME"}
+ 
+# Tipos Token que mapeiam para um operador fixo
+_MAPA_TIPO = {
+    "KW_RES":  "RES",
+    "OP_ADD":  "+",
+    "OP_SUB":  "-",
+    "OP_MUL":  "*",
+    "OP_DIV":  "/",
+    "OP_POW":  "^",
+    "OP_IDIV": "//",
+    "OP_MOD":  "%",
+}
+
+def _token_para_str(tok) -> str:
+    """
+    Converte um único objeto Token para a string que gerarAssembly usa.
+    Aceita qualquer objeto com atributos .tipo e .valor (duck typing).
+    Lança TypeError se o objeto não tiver esses atributos.
+    Lança ValueError se o tipo não for reconhecido.
+    """
+    # Duck typing: verifica se parece um Token
+    if not (hasattr(tok, "tipo") and hasattr(tok, "valor")):
+        raise TypeError(
+            f"Esperado str ou objeto com atributos 'tipo' e 'valor', "
+            f"recebido {type(tok).__name__!r}: {tok!r}"
+        )
+ 
+    tipo  = tok.tipo
+    valor = tok.valor
+ 
+    if tipo in _TIPOS_VALOR_DIRETO:
+        return valor                   # NUMBER e MEM_NAME usam o valor literal
+ 
+    if tipo in _MAPA_TIPO:
+        return _MAPA_TIPO[tipo]        # operadores e palavras-chave
+ 
+    tipos_validos = sorted(_MAPA_TIPO.keys() | _TIPOS_VALOR_DIRETO)
+    raise ValueError(
+        f"Tipo de token desconhecido: {tipo!r}.\n"
+        f"Tipos válidos: {tipos_validos}"
+    )
+ 
+ 
+def _normalizar_tokens(tokens: list) -> list[str]:
+    """
+    Recebe list[str] ou list[Token] (ou mistura) e devolve list[str].
+    Cada str é validada: deve ser não-vazia.
+    Cada Token é convertido via _token_para_str().
+    """
+    resultado = []
+    for i, tok in enumerate(tokens):
+        if isinstance(tok, str):
+            if not tok:
+                raise ValueError(f"Token na posição {i} é uma string vazia.")
+            resultado.append(tok)
+        else:
+            resultado.append(_token_para_str(tok))
+    return resultado
  
  
 def gerarAssembly(tokens: list[str]) -> str:
@@ -43,6 +108,8 @@ def gerarAssembly(tokens: list[str]) -> str:
  
     if not tokens:
         raise ValueError("Lista de tokens vazia.")
+    
+    tokens = _normalizar_tokens(tokens)
  
     # ------------------------------------------------------------------
     # Estado interno
