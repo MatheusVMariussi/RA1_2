@@ -209,4 +209,4 @@ def parseExpressao(linha, tokens):
 
         estado_atual = proximo_estado
 
-    return True
+    return tokens

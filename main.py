@@ -8,7 +8,7 @@
 import sys
 import re
 from testesAnalisadorLexico import testar_analisador_lexico
-from testesExecutarExpressao import testar_executar_expressao
+from testesExecutarExpressao import testar_executar_expressao, executarExpressao
 from maquinaDeEstados import parseExpressao
 
 # TODO (serão implementados pelos outros membros do grupo)
@@ -529,7 +529,7 @@ def gerarAssembly(tokens: list[str]) -> str:
 
 def exibirResultados(resultados):
     for resultado in resultados:
-        print(f"O resultado é {resultado}!")
+        print(f"O resultado da expressão é {resultado}!")
 
 
 # main
@@ -550,12 +550,15 @@ def main():
         sys.exit(1)
 
     nome_arquivo = sys.argv[1]
+    expressoes = []
+    print(f"Arquivo: {nome_arquivo}")
     linhas_expressoes = lerArquivo(nomeArquivo=nome_arquivo)
     for linha in linhas_expressoes:
-        parseExpressao(linha=linha, )
-    print(f"Arquivo: {nome_arquivo}")
-    print("(Integração completa será feita quando todas as partes estiverem prontas)")
-
+        expressoes = (parseExpressao(linha=linha, tokens=expressoes))
+    resultados = executarExpressao(tokens=expressoes, resultados=[], memoria={})
+    gerarAssembly(expressoes)
+    exibirResultados(resultados=resultados)
+    print("Expressão finalizada")
 
 if __name__ == "__main__":
     main()
