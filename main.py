@@ -647,12 +647,9 @@ def exibirResultados(resultados):
         print(f"O resultado da expressão é {resultado}!")
 
 def salvar_assembly(assembly, caminho, tokens):
-    expressao=[]
-    for item in tokens:
-        expressao.append(item.valor)
     with open(caminho, "w", encoding="utf-8") as f:
-        f.write(f"@ Expressão RPN: {' '.join(expressao)}\n")
-        f.write(assembly)
+        for item in assembly:
+            f.write(item)
 
 # main
 def main():
@@ -679,10 +676,8 @@ def main():
     for linha in linhas_expressoes:
         token_linha.append(parseExpressao(linha=linha, tokens=[]))
     salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte='teste_1.txt', nome_arquivo_saida='resultados/tokens.json')
-    for token in token_linha:
-        print(token)
-        #salvar_assembly(gerarAssembly(token), "resultados/arquivo.s", token)
-        resultados.append(executarExpressao(tokens=token, resultados=[], memoria={}))
+    salvar_assembly(gerarAssemblySequencia(token_linha), "resultados/arquivo.s", token_linha)
+    #resultados.append(executarExpressao(tokens=token, resultados=[], memoria={}))
     exibirResultados(resultados=resultados)
     print("Expressão finalizada")
 
