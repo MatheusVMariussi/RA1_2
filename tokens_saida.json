@@ -1,0 +1,182 @@
+{
+  "arquivo_fonte": "resultados/tokens.txt",
+  "linhas": [
+    {
+      "linha": 1,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "1"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "3"
+        },
+        {
+          "tipo": "OP_MUL",
+          "valor": "*"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "15"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "2"
+        },
+        {
+          "tipo": "OP_ADD",
+          "valor": "+"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "4"
+        },
+        {
+          "tipo": "OP_SUB",
+          "valor": "-"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "3"
+        },
+        {
+          "tipo": "OP_DIV",
+          "valor": "/"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    },
+    {
+      "linha": 2,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "3"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "2"
+        },
+        {
+          "tipo": "OP_INTDIV",
+          "valor": "//"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    },
+    {
+      "linha": 3,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "MEM_NAME",
+          "valor": "MEM"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    },
+    {
+      "linha": 4,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "10"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "2"
+        },
+        {
+          "tipo": "OP_ADD",
+          "valor": "+"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "MEM_NAME",
+          "valor": "MEM"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    },
+    {
+      "linha": 5,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "2"
+        },
+        {
+          "tipo": "KEYWORD_RES",
+          "valor": "RES"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    }
+  ]
+}

@@ -624,11 +624,12 @@ def main():
     print(f"Arquivo: {nome_arquivo}")
     linhas_expressoes = lerArquivo(nomeArquivo=nome_arquivo)
     for linha in linhas_expressoes:
-        tokens = (parseExpressao(linha=linha, tokens=tokens))
-    resultados = executarExpressao(tokens=tokens, resultados=[], memoria={})
+        tokens.append(parseExpressao(linha=linha, tokens=[]))
+    ##resultados = executarExpressao(tokens=tokens, resultados=[], memoria={})
+    print(tokens)
     salvar_tokens(todas_linhas_tokens=tokens, nome_arquivo_fonte="resultados/tokens.txt")
-    gerarAssembly(tokens)
-    exibirResultados(resultados=resultados)
+    ##gerarAssembly(tokens)
+    ##exibirResultados(resultados=resultados)
     print("Expressão finalizada")
 
 if __name__ == "__main__":
