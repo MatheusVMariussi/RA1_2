@@ -6,11 +6,11 @@
 # - Nome do Aluno 4, Nome do github 4
 
 import sys
-import re
 from testesAnalisadorLexico import testar_analisador_lexico
 from testesExecutarExpressao import testar_executar_expressao, executarExpressao
 from maquinaDeEstados import parseExpressao
 from token_class import salvar_tokens
+import os
 
 # TODO (serão implementados pelos outros membros do grupo)
 
@@ -459,10 +459,12 @@ def gerarAssembly(tokens: list[str]) -> str:
             i += 1
  
         elif tok == "RES":
-            if i + 1 >= len(tokens) or not is_number(tokens[i + 1]):
-                raise ValueError("RES precisa ser seguido de um número inteiro.")
-            load_res(int(float(tokens[i + 1])))
-            i += 2
+            if i == 0 or not is_number(tokens[i - 1]):
+                raise ValueError("RES precisa ser precedido de um número inteiro.")
+            dreg_n[0] -= 1
+            ireg_n[0] -= 1
+            load_res(int(float(tokens[i - 1])))
+            i += 1
  
         elif is_mem(tok):
             prev_is_value = i > 0 and (
@@ -531,6 +533,13 @@ def exibirResultados(resultados):
     for resultado in resultados:
         print(f"O resultado da expressão é {resultado}!")
 
+def salvar_assembly(assembly, caminho, tokens):
+    expressao=[]
+    for item in tokens:
+        expressao.append(item.valor)
+    with open(caminho, "w", encoding="utf-8") as f:
+        f.write(f"@ Expressão RPN: {' '.join(expressao)}\n")
+        f.write(assembly)
 
 # main
 def main():
@@ -550,16 +559,18 @@ def main():
         sys.exit(1)
 
     nome_arquivo = sys.argv[1]
-    tokens = []
+    token_linha = []
+    resultados=[]
     print(f"Arquivo: {nome_arquivo}")
     linhas_expressoes = lerArquivo(nomeArquivo=nome_arquivo)
     for linha in linhas_expressoes:
-        tokens.append(parseExpressao(linha=linha, tokens=[]))
-    ##resultados = executarExpressao(tokens=tokens, resultados=[], memoria={})
-    print(tokens)
-    salvar_tokens(todas_linhas_tokens=tokens, nome_arquivo_fonte="resultados/tokens.txt")
-    ##gerarAssembly(tokens)
-    ##exibirResultados(resultados=resultados)
+        token_linha.append(parseExpressao(linha=linha, tokens=[]))
+    salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte='teste_1.txt', nome_arquivo_saida='resultados/tokens.json')
+    for token in token_linha:
+        print(token)
+        #salvar_assembly(gerarAssembly(token), "resultados/arquivo.s", token)
+        resultados.append(executarExpressao(tokens=token, resultados=[], memoria={}))
+    exibirResultados(resultados=resultados)
     print("Expressão finalizada")
 
 if __name__ == "__main__":
