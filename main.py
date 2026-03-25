@@ -112,24 +112,49 @@ def _normalizar_tokens(tokens: list) -> list[str]:
             resultado.append(_token_para_str(tok))
     return resultado
  
-def gerarAssembly(tokens: list[str]) -> str:
+def gerarAssembly(tokens: list[str],
+                  history_externo: list | None = None) -> tuple[str, list]:
     """
     Converte uma lista de tokens RPN em código Assembly ARMv7.
     O resultado inteiro é exibido nos displays HEX0–HEX5.
+
+    Parâmetros
+    ----------
+    tokens : list[str]
+        Tokens da expressão RPN a ser compilada.
+    history_externo : list | None
+        Histórico de resultados de expressões anteriores, produzido por
+        chamadas anteriores a esta função.  Cada entrada é um dict:
+          {"kind": "float"|"int", "label": "<label .data>"}
+        onde "label" aponta para a posição de memória onde o resultado
+        daquela expressão foi persistido.
+        Quando None (padrão), não há histórico externo — comportamento
+        idêntico à versão original.
+
+    Retorno
+    -------
+    (asm, history_saida)
+        asm           : str  — código assembly gerado
+        history_saida : list — histórico atualizado para passar à próxima
+                               chamada (resultados desta expressão primeiro,
+                               seguidos dos resultados externos recebidos)
     """
  
     if not tokens:
         raise ValueError("Lista de tokens vazia.")
     
     tokens = _normalizar_tokens(tokens)
- 
+
+    # history_externo normalizado: garante lista mutável local
+    hist_ext = list(history_externo) if history_externo else []
+
     # ------------------------------------------------------------------
     # Estado interno
     # ------------------------------------------------------------------
     code       = []
     data       = []
     stack      = []    # {"reg": str, "kind": "float"|"int"}
-    history    = []
+    history    = []    # resultados desta expressão (reg vivo)
     const_pool = {}
     mem_vars   = set()
     label_n    = [0]
@@ -249,19 +274,54 @@ def gerarAssembly(tokens: list[str]) -> str:
             emit(f"    VSTR         {tmp}, [{r}]")
  
     def load_res(n):
-        if n >= len(history):
-            raise RuntimeError(f"RES({n}): sem resultado {n} posição(ões) atrás.")
-        past = history[n]
-        if past["kind"] == "float":
-            d = dreg()
-            note(f"RES({n}): copia {past['reg']} → {d}")
-            emit(f"    VMOV    {d}, {past['reg']}")
-            stack.append({"reg": d, "kind": "float"})
+        """
+        Carrega o resultado n posições atrás no histórico combinado.
+
+        Os primeiros len(history) índices referenciam resultados desta
+        própria expressão (reg ainda vivo → VMOV/MOV direto).
+        Índices além disso referenciam hist_ext, onde o valor já foi
+        persistido em memória → recarrega via LDR/VLDR ou LDR/VMOV.
+        """
+        total = len(history) + len(hist_ext)
+        if n >= total:
+            raise RuntimeError(
+                f"RES({n}): sem resultado {n} posição(ões) atrás "
+                f"(histórico local={len(history)}, externo={len(hist_ext)})."
+            )
+
+        if n < len(history):
+            # Resultado desta expressão — registrador ainda vivo
+            past = history[n]
+            if past["kind"] == "float":
+                d = dreg()
+                note(f"RES({n}): copia reg vivo {past['reg']} → {d}")
+                emit(f"    VMOV    {d}, {past['reg']}")
+                stack.append({"reg": d, "kind": "float"})
+            else:
+                r = ireg()
+                note(f"RES({n}): copia reg vivo {past['reg']} → {r}")
+                emit(f"    MOV     {r}, {past['reg']}")
+                stack.append({"reg": r, "kind": "int"})
         else:
-            r = ireg()
-            note(f"RES({n}): copia {past['reg']} → {r}")
-            emit(f"    MOV     {r}, {past['reg']}")
-            stack.append({"reg": r, "kind": "int"})
+            # Resultado de expressão anterior — recarrega da memória
+            ext = hist_ext[n - len(history)]
+            lbl = ext["label"]
+            note(f"RES({n}): recarrega memória {lbl} (expressão anterior)")
+            if ext["kind"] == "float":
+                d = dreg()
+                r = ireg()
+                emit(f"    LDR     {r}, ={lbl}")
+                emit(f"    VLDR    {d}, [{r}]")
+                stack.append({"reg": d, "kind": "float"})
+            else:
+                # inteiro foi salvo como double no slot → recarrega e trunca
+                d = dreg()
+                r = ireg()
+                r2 = ireg()
+                emit(f"    LDR     {r}, ={lbl}")
+                emit(f"    VLDR    {d}, [{r}]")
+                double_to_int(d, r2)
+                stack.append({"reg": r2, "kind": "int"})
  
     def float_op(op):
         if len(stack) < 2:
@@ -461,6 +521,7 @@ def gerarAssembly(tokens: list[str]) -> str:
         elif tok == "RES":
             if i == 0 or not is_number(tokens[i - 1]):
                 raise ValueError("RES precisa ser precedido de um número inteiro.")
+            stack.pop()   # descarta o número que foi carregado como float na iteração anterior
             dreg_n[0] -= 1
             ireg_n[0] -= 1
             load_res(int(float(tokens[i - 1])))
@@ -501,6 +562,33 @@ def gerarAssembly(tokens: list[str]) -> str:
     data.append(f"             .byte 0x{SEG7_BLANK:02X}   @ vazio")
     data.append(f"             .byte 0x{SEG7_MINUS:02X}   @ traço")
     data.append("             .align 2")
+
+    # ------------------------------------------------------------------
+    # Persiste o resultado final em _RES_SLOT para expressões futuras.
+    # Sempre armazenado como double (8 bytes) para uniformidade:
+    #   float  → VSTR direto
+    #   int    → converte para double, depois VSTR
+    # ------------------------------------------------------------------
+    slot_lbl = new_label("_RES_SLOT_")
+    data.append("")
+    data.append(f"@ slot de persistência para RES entre expressões")
+    data.append(f"{slot_lbl}:  .double 0.0")
+
+    note(f"persiste resultado final em {slot_lbl}")
+    r_slot = ireg()
+    emit(f"    LDR     {r_slot}, ={slot_lbl}")
+    if final["kind"] == "float":
+        emit(f"    VSTR    {final['reg']}, [{r_slot}]")
+    else:
+        # int → double temporário em d14, depois VSTR
+        emit(f"    VMOV         s28, {final['reg']}")
+        emit(f"    VCVT.F64.S32 d14, s28")
+        emit(f"    VSTR         d14, [{r_slot}]")
+
+    # history_saida: resultados desta expressão (com label) + externos
+    # Os resultados locais de history já têm "reg"; adicionamos "label"
+    # apenas para o resultado final (os intermediários não são persistidos).
+    history_saida = [{"kind": final["kind"], "label": slot_lbl}] + hist_ext
  
     # ------------------------------------------------------------------
     # Monta saída final
@@ -525,8 +613,33 @@ def gerarAssembly(tokens: list[str]) -> str:
         "    B   .   @ halt",
     ]
  
-    return "\n".join(partes)
- 
+    return "\n".join(partes), history_saida
+
+
+# ---------------------------------------------------------------------------
+# Função que mantém histórico entre expressões
+# ---------------------------------------------------------------------------
+
+def gerarAssemblySequencia(lista_de_tokens: list[list]) -> list[str]:
+    """
+    Compila uma sequência de expressões RPN, mantendo o histórico de
+    resultados entre elas para que RES possa referenciar expressões
+    anteriores.
+    """
+    if not lista_de_tokens:
+        raise ValueError("Lista de expressões vazia.")
+
+    resultados = []
+    history    = None   # None na primeira chamada → sem histórico externo
+
+    for idx, tokens in enumerate(lista_de_tokens):
+        if not tokens:
+            raise ValueError(f"Expressão na posição {idx} está vazia.")
+
+        asm, history = gerarAssembly(tokens, history_externo=history)
+        resultados.append(asm)
+
+    return resultados
 
 
 def exibirResultados(resultados):
