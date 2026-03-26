@@ -10,9 +10,6 @@ from testesAnalisadorLexico import testar_analisador_lexico
 from testesExecutarExpressao import testar_executar_expressao, executarExpressao
 from maquinaDeEstados import parseExpressao
 from token_class import salvar_tokens
-import os
-
-# TODO (serão implementados pelos outros membros do grupo)
 
 def lerArquivo(nomeArquivo):
     linhas = []
@@ -695,8 +692,8 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
     return "\n".join(partes)
 
 def exibirResultados(resultados):
-    for resultado in resultados:
-        print(f"O resultado da expressão é {resultado}!")
+    for linha in range(len(resultados)):
+        print(f"O resultado da expressão na linha {linha+1} é {resultados[linha]}!")
 
 def salvar_assembly(assembly, caminho, tokens):
     with open(caminho, "w", encoding="utf-8") as f:
@@ -729,7 +726,7 @@ def main():
         token_linha.append(parseExpressao(linha=linha, tokens=[]))
     salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte='teste_1.txt', nome_arquivo_saida='resultados/tokens.json')
     salvar_assembly(gerarAssemblySequencia(token_linha, halt_entre_blocos= True), "resultados/arquivo.s", token_linha)
-    #resultados.append(executarExpressao(tokens=token, resultados=[], memoria={}))
+    resultados = (executarExpressao(tokens_lista=token_linha, resultados=[], memoria={}))
     exibirResultados(resultados=resultados)
     print("Expressão finalizada")
 
