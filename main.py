@@ -104,6 +104,7 @@ class _Estado:
         self.label_n    = 0          # contador global de labels
         self.dreg_n     = 0          # próximo d-reg disponível
         self.ireg_n     = 0          # próximo r-reg disponível
+        self.free_iregs = ["r0","r1","r2","r3","r4","r5","r6","r7","r8","r9"]
         self.const_pool = {}         # valor_str → label .data
         self.mem_vars   = set()      # nomes de variáveis já declaradas
         self.data       = []         # linhas acumuladas do .data
@@ -113,6 +114,7 @@ class _Estado:
         """Reseta contadores de registradores entre blocos da sequência."""
         self.dreg_n = 0
         self.ireg_n = 0
+        self.free_iregs = ["r0","r1","r2","r3","r4","r5","r6","r7","r8","r9"]
 
 
 # ---------------------------------------------------------------------------
@@ -148,11 +150,13 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         return r
 
     def ireg():
-        if estado.ireg_n > 10:
-            raise RuntimeError("Registradores inteiros esgotados (máx r10).")
-        r = f"r{estado.ireg_n}"
-        estado.ireg_n += 1
-        return r
+        if not estado.free_iregs:
+            raise RuntimeError("Registradores inteiros esgotados.")
+        return estado.free_iregs.pop(0)
+    
+    def free_ireg(r):
+        if r not in estado.free_iregs:
+            estado.free_iregs.insert(0, r)
 
     def emit(line): code.append(line)
     def note(msg):  code.append(f"    @ {msg}")
@@ -247,28 +251,39 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         lbl = const_label(value_str)
         d   = dreg()
         r   = ireg()
+
         note(f"carrega {value_str} → {d}")
         emit(f"    LDR     {r}, ={lbl}")
         emit(f"    VLDR    {d}, [{r}]")
+
+        free_ireg(r) 
+
         stack.append({"reg": d, "kind": "float"})
 
     def load_mem(name):
         lbl = mem_label(name)
         d   = dreg()
         r   = ireg()
+
         note(f"lê {name} → {d}")
         emit(f"    LDR     {r}, ={lbl}")
         emit(f"    VLDR    {d}, [{r}]")
+
+        free_ireg(r) 
+
         stack.append({"reg": d, "kind": "float"})
 
     def store_mem(name):
         if not stack:
             raise RuntimeError(f"Pilha vazia ao gravar em {name}.")
+
         op  = stack[-1]
         lbl = mem_label(name)
         r   = ireg()
+
         note(f"grava {op['reg']} → {name}")
         emit(f"    LDR     {r}, ={lbl}")
+
         if op["kind"] == "float":
             emit(f"    VSTR    {op['reg']}, [{r}]")
         else:
@@ -277,47 +292,40 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
             emit(f"    VCVT.F64.S32 {tmp}, {sreg_low(tmp)}")
             emit(f"    VSTR         {tmp}, [{r}]")
 
+        free_ireg(r) 
+
     def load_res(n):
-        """
-        Índices dentro do history local (reg vivo) → VMOV/MOV direto.
-        Índices no history externo (expressões anteriores) → recarga
-        da label .data onde o resultado foi persistido.
-        """
         history = estado.history
+
         if n >= len(history):
-            raise RuntimeError(
-                f"RES({n}): sem resultado {n} posição(ões) atrás "
-                f"(histórico={len(history)})."
-            )
+            raise RuntimeError(f"RES({n}): histórico insuficiente.")
+
         past = history[n]
+
         if "reg" in past:
-            # Reg ainda vivo neste bloco
             if past["kind"] == "float":
                 d = dreg()
-                note(f"RES({n}): copia reg vivo {past['reg']} → {d}")
                 emit(f"    VMOV    {d}, {past['reg']}")
                 stack.append({"reg": d, "kind": "float"})
             else:
                 r = ireg()
-                note(f"RES({n}): copia reg vivo {past['reg']} → {r}")
                 emit(f"    MOV     {r}, {past['reg']}")
                 stack.append({"reg": r, "kind": "int"})
         else:
-            # Resultado persistido em memória por bloco anterior
             lbl = past["label"]
-            note(f"RES({n}): recarrega de memória {lbl}")
+
+            d = dreg()
+            r = ireg()
+
+            emit(f"    LDR     {r}, ={lbl}")
+            emit(f"    VLDR    {d}, [{r}]")
+
+            free_ireg(r)
+
             if past["kind"] == "float":
-                d = dreg()
-                r = ireg()
-                emit(f"    LDR     {r}, ={lbl}")
-                emit(f"    VLDR    {d}, [{r}]")
                 stack.append({"reg": d, "kind": "float"})
             else:
-                d = dreg()
-                r = ireg()
                 r2 = ireg()
-                emit(f"    LDR     {r}, ={lbl}")
-                emit(f"    VLDR    {d}, [{r}]")
                 double_to_int(d, r2)
                 stack.append({"reg": r2, "kind": "int"})
 
@@ -400,97 +408,171 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         val_reg  = val["reg"]
         val_kind = val["kind"]
 
-        rWork  = "r10"
-        rDiv   = "r3"
-        rQuo   = "r4"
-        rRem   = "r5"
-        rPos   = "r6"
-        rShift = "r7"
-        rSeg   = "r2"
-        rTmp   = "r8"
-        rDisp  = "r11"
+        # Registradores de trabalho
+        rCnt   = "r1"   # contador de dígitos emitidos
+        rSeg   = "r2"   # código do dígito 7-seg
+        rDiv   = "r3"   # divisor 10
+        rQuo   = "r4"   # quociente
+        rRem   = "r5"   # resto
+        rPos   = "r6"   # posição do dígito no display
+        rShift = "r7"   # shift = pos * 8
+        rTmp   = "r8"   # temporário
+        rNeg   = "r9"   # flag de sinal
+        rWork  = "r10"  # valor inteiro em processamento
+        rLo    = "r11"  # HEX0-HEX3
+        rHi    = "r12"  # HEX4-HEX5
 
-        lbl_loop = new_label("seg_loop")
+        lbl_abs          = new_label("SEG_ABS")
+        lbl_after_abs    = new_label("SEG_AFTER_ABS")
+        lbl_skip_sign    = new_label("SEG_SKIP_SIGN")
+        lbl_loop         = new_label("SEG_LOOP")
+        lbl_div          = new_label("SEG_DIV")
+        lbl_div_end      = new_label("SEG_DIV_END")
+        lbl_no_dot       = new_label("SEG_NODOT")
+        lbl_write_low    = new_label("SEG_WRITE_LOW")
+        lbl_after_write  = new_label("SEG_AFTER_WRITE")
+        lbl_done         = new_label("SEG_DONE")
 
-        # -----------------------------------
-        # FLOAT → escala por 10
-        # -----------------------------------
+        # ------------------------------------------------------------
+        # 1) Prepara o valor absoluto em rWork
+        #    - float: usa |valor| * 10 e arredonda para inteiro
+        #    - int: usa |valor|
+        #    Também guarda se o valor era negativo em rNeg.
+        # ------------------------------------------------------------
         if val_kind == "float":
             lbl_10 = const_label("10.0")
 
-            emit(f"    LDR     r12, ={lbl_10}")
-            emit(f"    VLDR    d31, [r12]")
-            emit(f"    VMUL.F64 d30, {val_reg}, d31")
+            emit(f"    VCMP.F64    {val_reg}, #0")
+            emit(f"    VMRS        APSR_nzcv, FPSCR")
+            emit(f"    MOV         {rNeg}, #0")
+            emit(f"    BGE         {lbl_abs}")
+            emit(f"    VNEG.F64    d14, {val_reg}")
+            emit(f"    MOV         {rNeg}, #1")
+            emit(f"    B           {lbl_after_abs}")
+            emit(f"{lbl_abs}:")
+            emit(f"    VMOV.F64    d14, {val_reg}")
+            emit(f"{lbl_after_abs}:")
+            emit(f"    LDR         r0, ={lbl_10}")
+            emit(f"    VLDR        d15, [r0]")
+            emit(f"    VMUL.F64    d15, d14, d15")
+            double_to_int("d15", rWork)
 
-            double_to_int("d30", rWork)
+            min_digits = 2   # float precisa mostrar pelo menos "0.x"
         else:
-            emit(f"    MOV     {rWork}, {val_reg}")
+            emit(f"    MOV         {rWork}, {val_reg}")
+            emit(f"    MOV         {rNeg}, #0")
+            emit(f"    CMP         {rWork}, #0")
+            emit(f"    BGE         {lbl_abs}")
+            emit(f"    RSB         {rWork}, {rWork}, #0")
+            emit(f"    MOV         {rNeg}, #1")
+            emit(f"{lbl_abs}:")
+            min_digits = 1
 
-        # -----------------------------------
-        # INIT (CORRIGIDO - ACTIVE HIGH)
-        # -----------------------------------
-        emit(f"    MOV     {rDisp}, #0")   # display apagado
-        emit(f"    MOV     {rPos}, #0")
+        # ------------------------------------------------------------
+        # 2) Inicializa os dois words do display
+        # ------------------------------------------------------------
+        emit(f"    MOV         {rLo}, #0")   # HEX0-HEX3
+        emit(f"    MOV         {rHi}, #0")   # HEX4-HEX5
+        emit(f"    MOV         {rCnt}, #0")
+        emit(f"    MOV         {rPos}, #0")
 
+        # Se for negativo, coloca '-' em HEX5 (active high: 0x40)
+        emit(f"    CMP         {rNeg}, #0")
+        emit(f"    BEQ         {lbl_skip_sign}")
+        emit(f"    MOV         {rTmp}, #0x40")
+        emit(f"    LSL         {rTmp}, {rTmp}, #8")   # HEX5
+        emit(f"    ORR         {rHi}, {rHi}, {rTmp}")
+        emit(f"{lbl_skip_sign}:")
+
+        # ------------------------------------------------------------
+        # 3) Loop de extração e escrita dos dígitos
+        #    - até 6 dígitos se positivo
+        #    - até 5 dígitos se negativo (HEX5 é o sinal)
+        #    - float mantém pelo menos 2 dígitos para mostrar 0.x
+        # ------------------------------------------------------------
         emit(f"{lbl_loop}:")
 
-        # divisão por 10
-        emit(f"    MOV     {rDiv}, #10")
-        emit(f"    MOV     {rQuo}, #0")
-        emit(f"    MOV     {rRem}, {rWork}")
+        # Limite máximo de dígitos visíveis
+        emit(f"    CMP         {rNeg}, #0")
+        emit(f"    MOVEQ       {rTmp}, #6")
+        emit(f"    MOVNE       {rTmp}, #5")
+        emit(f"    CMP         {rCnt}, {rTmp}")
+        emit(f"    BGE         {lbl_done}")
 
-        lbl_div = new_label("div_loop")
-        lbl_div_end = new_label("div_end")
+        # divisor = 10
+        emit(f"    MOV         {rDiv}, #10")
+        emit(f"    MOV         {rQuo}, #0")
+        emit(f"    MOV         {rRem}, {rWork}")
 
+        # divisão manual por 10
         emit(f"{lbl_div}:")
-        emit(f"    CMP     {rRem}, {rDiv}")
-        emit(f"    BLT     {lbl_div_end}")
-        emit(f"    SUB     {rRem}, {rRem}, {rDiv}")
-        emit(f"    ADD     {rQuo}, {rQuo}, #1")
-        emit(f"    B       {lbl_div}")
-
+        emit(f"    CMP         {rRem}, {rDiv}")
+        emit(f"    BLT         {lbl_div_end}")
+        emit(f"    SUB         {rRem}, {rRem}, {rDiv}")
+        emit(f"    ADD         {rQuo}, {rQuo}, #1")
+        emit(f"    B           {lbl_div}")
         emit(f"{lbl_div_end}:")
 
-        # converte dígito
-        emit(f"    MOV     r0, {rRem}")
-        emit(f"    BL      digit_to_7seg")
-        emit(f"    MOV     {rSeg}, r0")
+        # converte o dígito atual
+        emit(f"    MOV         r0, {rRem}")
+        emit(f"    BL          digit_to_7seg")
+        emit(f"    MOV         {rSeg}, r0")
 
-        # -----------------------------------
-        # PONTO DECIMAL (CORRIGIDO)
-        # -----------------------------------
+        # ponto decimal: para float, o ponto fica no dígito da posição 1
+        # (ex.: 12.3 => dígitos 3,2,1 e ponto no "2")
         if val_kind == "float":
-            emit(f"    CMP     {rPos}, #0")
-            emit(f"    BNE     no_dot_{lbl_loop}")
-            emit(f"    ORR     {rSeg}, {rSeg}, #0x80")  # liga ponto (ACTIVE HIGH)
-            emit(f"no_dot_{lbl_loop}:")
+            emit(f"    CMP         {rPos}, #1")
+            emit(f"    BNE         {lbl_no_dot}")
+            emit(f"    ORR         {rSeg}, {rSeg}, #0x80")
+            emit(f"{lbl_no_dot}:")
 
-        # -----------------------------------
-        # SHIFT DO DÍGITO
-        # -----------------------------------
-        emit(f"    MOV     {rShift}, {rPos}")
-        emit(f"    ADD     {rShift}, {rShift}, {rShift}")
-        emit(f"    ADD     {rShift}, {rShift}, {rShift}")
-        emit(f"    ADD     {rShift}, {rShift}, {rShift}")
+        # posição -> deslocamento em bytes (8 bits por display)
+        emit(f"    MOV         {rShift}, {rPos}")
+        emit(f"    ADD         {rShift}, {rShift}, {rShift}")
+        emit(f"    ADD         {rShift}, {rShift}, {rShift}")
+        emit(f"    ADD         {rShift}, {rShift}, {rShift}")
 
-        emit(f"    MOV     {rTmp}, {rSeg}")
-        emit(f"    LSL     {rTmp}, {rTmp}, {rShift}")
+        emit(f"    MOV         {rTmp}, {rSeg}")
+        emit(f"    LSL         {rTmp}, {rTmp}, {rShift}")
 
-        # -----------------------------------
-        # ACUMULA NO DISPLAY (CORRIGIDO)
-        # -----------------------------------
-        emit(f"    ORR     {rDisp}, {rDisp}, {rTmp}")
+        # escreve em HEX0-HEX3 ou HEX4-HEX5
+        emit(f"    CMP         {rPos}, #3")
+        emit(f"    BGT         {lbl_write_low}")
 
-        # próximo dígito
-        emit(f"    MOV     {rWork}, {rQuo}")
-        emit(f"    ADD     {rPos}, {rPos}, #1")
+        # HEX0-HEX3 -> rLo
+        emit(f"    ORR         {rLo}, {rLo}, {rTmp}")
+        emit(f"    B           {lbl_after_write}")
 
-        emit(f"    CMP     {rWork}, #0")
-        emit(f"    BNE     {lbl_loop}")
+        # HEX4-HEX5 -> rHi
+        emit(f"{lbl_write_low}:")
+        emit(f"    SUB         {rShift}, {rPos}, #4")
+        emit(f"    MOV         {rTmp}, {rSeg}")
+        emit(f"    MOV         r0, {rShift}")
+        emit(f"    ADD         r0, r0, r0")
+        emit(f"    ADD         r0, r0, r0")
+        emit(f"    ADD         r0, r0, r0")
+        emit(f"    LSL         {rTmp}, {rTmp}, r0")
+        emit(f"    ORR         {rHi}, {rHi}, {rTmp}")
 
-        # escreve no display
-        emit(f"    LDR     r0, =0xFF200020")
-        emit(f"    STR     {rDisp}, [r0]")
+        emit(f"{lbl_after_write}:")
+        emit(f"    MOV         {rWork}, {rQuo}")
+        emit(f"    ADD         {rCnt}, {rCnt}, #1")
+        emit(f"    ADD         {rPos}, {rPos}, #1")
+
+        # continua enquanto ainda houver valor ou enquanto não atingir o mínimo
+        emit(f"    CMP         {rWork}, #0")
+        emit(f"    BNE         {lbl_loop}")
+        emit(f"    CMP         {rCnt}, #{min_digits}")
+        emit(f"    BLT         {lbl_loop}")
+
+        # ------------------------------------------------------------
+        # 4) Escreve nos dois registradores do display
+        # ------------------------------------------------------------
+        emit(f"{lbl_done}:")
+        emit(f"    LDR         r0, =0xFF200020")
+        emit(f"    STR         {rLo}, [r0]")
+        emit(f"    LDR         r0, =0xFF200030")
+        emit(f"    STR         {rHi}, [r0]")
     # ------------------------------------------------------------------
     # Loop principal do bloco
     # ------------------------------------------------------------------
