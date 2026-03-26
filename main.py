@@ -569,7 +569,7 @@ def gerarAssembly(tokens: list) -> str:
     return "\n".join(partes)
 
 
-def gerarAssemblySequencia(lista_de_tokens: list[list]) -> str:
+def gerarAssemblySequencia(lista_de_tokens: list[list], halt_entre_blocos:bool = True) -> str:
     """
     Compila uma sequência de expressões RPN num único arquivo .s.
 
@@ -599,8 +599,13 @@ def gerarAssemblySequencia(lista_de_tokens: list[list]) -> str:
         todos_code.append(f"    @ --- bloco {idx}: {' '.join(tokens)} ---")
         code, _ = _compilar_bloco(tokens, estado)
         todos_code.extend(code)
-        todos_code.append("")  # linha em branco entre blocos
 
+        # Pausa intermediária (omitida no último bloco — o halt final já o cobre)
+        eh_ultimo = (idx == len(lista_de_tokens) - 1)
+        if halt_entre_blocos and not eh_ultimo:
+            todos_code.append(f"    BKPT    #0   @ pausa — fim do bloco {idx} (Continue no CPUlator para prosseguir)")
+
+        todos_code.append("")  # linha em branco entre blocos
     # SEG7_TABLE declarada uma única vez no .data compartilhado
     estado.data.append("")
     estado.data.append("@ gfedcba: dígitos 0-9")
@@ -663,7 +668,7 @@ def main():
     for linha in linhas_expressoes:
         token_linha.append(parseExpressao(linha=linha, tokens=[]))
     salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte='teste_1.txt', nome_arquivo_saida='resultados/tokens.json')
-    salvar_assembly(gerarAssemblySequencia(token_linha), "resultados/arquivo.s", token_linha)
+    salvar_assembly(gerarAssemblySequencia(token_linha, halt_entre_blocos= True), "resultados/arquivo.s", token_linha)
     #resultados.append(executarExpressao(tokens=token, resultados=[], memoria={}))
     exibirResultados(resultados=resultados)
     print("Expressão finalizada")
