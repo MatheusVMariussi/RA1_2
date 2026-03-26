@@ -27,8 +27,6 @@ Gerador de código Assembly ARMv7 para expressões RPN.
 Compatível com CPUlator ARMv7 DE1-SoC (Cortex-A9, neon-fp16, softfp).
 """
 
-import re
-
 SEG7_DIGITS = [0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F]
 SEG7_BLANK  = 0x00
 SEG7_MINUS  = 0x40
@@ -125,12 +123,6 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
     """
     Compila uma expressão RPN em linhas de código (.text) usando o
     `estado` fornecido para contadores, constantes e memória.
-
-    Retorna (linhas_code, resultado_final) onde resultado_final é
-    {"reg": str, "kind": "float"|"int"}.
-
-    O `estado` é mutado: novos dados são acrescentados a estado.data,
-    o history é atualizado e os contadores avançam.
     """
 
     code  = []
@@ -361,7 +353,12 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
             stack.append(result)
             estado.history.insert(0, result)
 
-    def emit_seven_seg(val_reg: str):
+    def emit_seven_seg_int(val_reg: str, n_digitos: int = 6):
+        """
+        Exibe o inteiro em val_reg nos primeiros n_digitos displays
+        (HEX0 = dígito menos significativo).
+        Registradores de trabalho: r0-r7 (scratch da rotina de display).
+        """
         lbl_pos  = new_label("SEG_POS")
         lbl_loop = new_label("SEG_LOOP")
         lbl_done = new_label("SEG_DONE")
@@ -376,8 +373,6 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         rTmp = "r5"
         rIdx = "r6"
 
-        note("=== seven segment display ===")
-        note(f"copia {val_reg} → {rV}")
         emit(f"    MOV     {rV}, {val_reg}")
         note("limpa HEX0-HEX3 e HEX4-HEX5")
         emit(f"    LDR     {rA}, =0xFF200020")
@@ -398,7 +393,7 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         emit(f"    LDR     {rB}, =SEG7_TABLE")
         emit(f"    MOV     {rIdx}, #0")
         emit(f"{lbl_loop}:")
-        emit(f"    CMP     {rIdx}, #6")
+        emit(f"    CMP     {rIdx}, #{n_digitos}")
         emit(f"    BGE     {lbl_done}")
         lbl_ten = const_label("10.0")
         note("extrai próximo dígito via FPU")
@@ -438,6 +433,97 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         emit(f"    CMP     {rV}, #0")
         emit(f"    BNE     {lbl_loop}")
         emit(f"{lbl_done}:")
+
+    def emit_seven_seg(final: dict):
+        """
+        Despacha para a rotina de display correta conforme o tipo do resultado.
+
+        int  → 6 dígitos inteiros em HEX0–HEX5  (comportamento original)
+        float→ Layout:
+                 HEX0–HEX2 : 2 casas decimais  (dígitos menos significativos)
+                 HEX3      : 1º dígito da parte inteira + ponto decimal (bit 7)
+                 HEX4–HEX5 : restante da parte inteira / sinal
+               Estratégia: multiplica o double por 100, trunca para inteiro
+               e exibe os 5 dígitos resultantes em HEX0–HEX4; o ponto decimal
+               é aceso no bit 7 de HEX2 (separador entre casas decimais e inteiro).
+        """
+        note("=== seven segment display ===")
+
+        if final["kind"] == "int":
+            # Caminho original — inteiro direto
+            int_res = to_int(final)
+            note(f"exibe inteiro {int_res['reg']}")
+            emit_seven_seg_int(int_res["reg"], n_digitos=6)
+
+        else:
+            # Float: multiplica por 100 para obter 2 casas decimais como inteiro
+            lbl_100  = const_label("100.0")
+            lbl_pos  = new_label("SEGF_POS")
+            rTmp     = "r5"
+            rA       = "r4"
+            rInteiro = "r0"   # resultado × 100 truncado (parte inteira + 2 dec)
+            rSinal   = "r1"   # 1 se negativo, 0 se positivo
+
+            d_orig = final["reg"]       # d-reg com o valor original
+            d_x100 = "d15"              # scratch: valor × 100
+
+            note(f"float → display: {d_orig} × 100 → inteiro com 2 casas decimais")
+
+            # Limpa displays
+            emit(f"    LDR     {rA}, =0xFF200020")
+            emit(f"    MOV     {rTmp}, #0")
+            emit(f"    STR     {rTmp}, [{rA}]")
+            emit(f"    LDR     {rA}, =0xFF200030")
+            emit(f"    STR     {rTmp}, [{rA}]")
+
+            # Detecta sinal e trabalha com valor absoluto
+            note("detecta sinal")
+            emit(f"    VCMP.F64    {d_orig}, #0")
+            emit(f"    VMRS        APSR_nzcv, FPSCR")
+            emit(f"    MOV         {rSinal}, #0")
+            emit(f"    BGE         {lbl_pos}")
+            note("negativo: inverte e marca sinal")
+            emit(f"    VNEG.F64    d14, {d_orig}")   # d14 = abs(valor)
+            emit(f"    MOV         {rSinal}, #1")
+            emit(f"    B           {lbl_pos}+4")     # pula o VMOV abaixo
+            emit(f"{lbl_pos}:")
+            emit(f"    VMOV        d14, {d_orig}")   # d14 = valor (positivo)
+
+            # Multiplica por 100 e trunca
+            note("multiplica por 100 e trunca")
+            emit(f"    LDR         {rTmp}, ={lbl_100}")
+            emit(f"    VLDR        {d_x100}, [{rTmp}]")
+            emit(f"    VMUL.F64    {d_x100}, d14, {d_x100}")
+            emit(f"    VCVT.S32.F64 s28, {d_x100}")
+            emit(f"    VMOV        {rInteiro}, s28")   # rInteiro = trunc(|x| * 100)
+
+            # Exibe os 5 dígitos em HEX0–HEX4 (2 decimais + até 3 inteiros)
+            note("exibe 5 dígitos: HEX0-HEX1=casas decimais, HEX2-HEX4=parte inteira")
+            emit_seven_seg_int(rInteiro, n_digitos=5)
+
+            # Acende o ponto decimal no bit 7 de HEX2
+            # HEX2 está nos bits [23:16] do registrador 0xFF200020
+            note("acende ponto decimal em HEX2 (bit 7 = 0x80, posição 16)")
+            emit(f"    LDR     {rA}, =0xFF200020")
+            emit(f"    LDR     {rTmp}, [{rA}]")
+            emit(f"    MOV     r6, #0x80")
+            emit(f"    LSL     r6, r6, #16")          # posiciona em HEX2
+            emit(f"    ORR     {rTmp}, {rTmp}, r6")
+            emit(f"    STR     {rTmp}, [{rA}]")
+
+            # Exibe sinal negativo em HEX5 se necessário
+            lbl_pos_sinal = new_label("SEGF_SKIP_SINAL")
+            note("sinal negativo em HEX5")
+            emit(f"    CMP         {rSinal}, #0")
+            emit(f"    BEQ         {lbl_pos_sinal}")
+            emit(f"    LDR         {rA}, =0xFF200030")
+            emit(f"    LDR         {rTmp}, [{rA}]")
+            emit(f"    MOV         r6, #0x40")
+            emit(f"    LSL         r6, r6, #8")        # posiciona em HEX5
+            emit(f"    ORR         {rTmp}, {rTmp}, r6")
+            emit(f"    STR         {rTmp}, [{rA}]")
+            emit(f"{lbl_pos_sinal}:")
+
         note("=== display atualizado ===")
 
     # ------------------------------------------------------------------
@@ -492,10 +578,9 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         raise RuntimeError("Pilha vazia — expressão não produziu resultado.")
 
     final   = stack[-1]
-    int_res = to_int(final)
 
     emit("")
-    emit_seven_seg(int_res["reg"])
+    emit_seven_seg(final)
 
     # Persiste resultado final em slot de memória (para RES entre blocos)
     slot_lbl = new_label("_RES_SLOT_")
@@ -565,14 +650,16 @@ def gerarAssembly(tokens: list) -> str:
     return "\n".join(partes)
 
 
-def gerarAssemblySequencia(lista_de_tokens: list[list]) -> str:
+def gerarAssemblySequencia(lista_de_tokens: list[list],
+                           halt_entre_blocos: bool = False) -> str:
     """
     Compila uma sequência de expressões RPN num único arquivo .s.
 
     As expressões são executadas em ordem; o display é atualizado ao
     final de cada uma. RES pode referenciar resultados de expressões
     anteriores — os registradores são resetados entre blocos, mas os
-    valores são persistidos em slots de memória (.data).    
+    valores são persistidos em slots de memória (.data).
+
     """
     if not lista_de_tokens:
         raise ValueError("Lista de expressões vazia.")
@@ -595,6 +682,12 @@ def gerarAssemblySequencia(lista_de_tokens: list[list]) -> str:
         todos_code.append(f"    @ --- bloco {idx}: {' '.join(tokens)} ---")
         code, _ = _compilar_bloco(tokens, estado)
         todos_code.extend(code)
+
+        # Pausa intermediária (omitida no último bloco — o halt final já o cobre)
+        eh_ultimo = (idx == len(lista_de_tokens) - 1)
+        if halt_entre_blocos and not eh_ultimo:
+            todos_code.append(f"    BKPT    #0   @ pausa — fim do bloco {idx} (Continue no CPUlator para prosseguir)")
+
         todos_code.append("")  # linha em branco entre blocos
 
     # SEG7_TABLE declarada uma única vez no .data compartilhado
