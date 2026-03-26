@@ -10,7 +10,7 @@ class Token:
         return f"Token({self.tipo}, '{self.valor}')"
 
 # Salvar tokens em arquivo JSON
-def salvar_tokens(todas_linhas_tokens, nome_arquivo_fonte):
+def salvar_tokens(todas_linhas_tokens, nome_arquivo_fonte, nome_arquivo_saida):
 
     saida = {
         "arquivo_fonte": nome_arquivo_fonte,
@@ -27,5 +27,5 @@ def salvar_tokens(todas_linhas_tokens, nome_arquivo_fonte):
         }
         saida["linhas"].append(linha_obj)
 
-    with open("tokens_saida.json", "w", encoding="utf-8") as f:
+    with open(nome_arquivo_saida, "w", encoding="utf-8") as f:
         json.dump(saida, f, indent=2, ensure_ascii=False)

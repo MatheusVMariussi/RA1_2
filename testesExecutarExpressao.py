@@ -8,7 +8,7 @@ def executarExpressao(tokens, resultados, memoria):
     for token in tokens:
         if token.tipo == 'NUMBER':
             pilha.append(float(token.valor))
-        elif token.tipo == 'MEM_NAME':
+        elif token.tipo == 'MEM':
             nome = token.valor
             if pilha:
                 # Há valor na pilha: armazenar na memória (WRITE)

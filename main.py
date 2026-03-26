@@ -6,9 +6,12 @@
 # - Nome do Aluno 4, Nome do github 4
 
 import sys
-import re
 from testesAnalisadorLexico import testar_analisador_lexico
-from testesExecutarExpressao import testar_executar_expressao
+from testesExecutarExpressao import testar_executar_expressao, executarExpressao
+from maquinaDeEstados import parseExpressao
+from token_class import salvar_tokens
+import os
+import re
 
 # TODO (serão implementados pelos outros membros do grupo)
 
@@ -44,8 +47,10 @@ _MAPA_TIPO = {
     "OP_MUL":  "*",
     "OP_DIV":  "/",
     "OP_POW":  "^",
-    "OP_IDIV": "//",
+    "OP_INTDIV": "//",
     "OP_MOD":  "%",
+    "LPAREN": "(",
+    "RPAREN": ")",
 }
 
 def _token_para_str(tok) -> str:
@@ -689,7 +694,6 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
             todos_code.append(f"    BKPT    #0   @ pausa — fim do bloco {idx} (Continue no CPUlator para prosseguir)")
 
         todos_code.append("")  # linha em branco entre blocos
-
     # SEG7_TABLE declarada uma única vez no .data compartilhado
     estado.data.append("")
     estado.data.append("@ gfedcba: dígitos 0-9")
@@ -719,9 +723,13 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
     return "\n".join(partes)
 
 def exibirResultados(resultados):
-    # Exibe os resultados formatados no console
-    pass
+    for resultado in resultados:
+        print(f"O resultado da expressão é {resultado}!")
 
+def salvar_assembly(assembly, caminho, tokens):
+    with open(caminho, "w", encoding="utf-8") as f:
+        for item in assembly:
+            f.write(item)
 
 # main
 def main():
@@ -741,9 +749,17 @@ def main():
         sys.exit(1)
 
     nome_arquivo = sys.argv[1]
+    token_linha = []
+    resultados=[]
     print(f"Arquivo: {nome_arquivo}")
-    print("(Integração completa será feita quando todas as partes estiverem prontas)")
-
+    linhas_expressoes = lerArquivo(nomeArquivo=nome_arquivo)
+    for linha in linhas_expressoes:
+        token_linha.append(parseExpressao(linha=linha, tokens=[]))
+    salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte='teste_1.txt', nome_arquivo_saida='resultados/tokens.json')
+    salvar_assembly(gerarAssemblySequencia(token_linha, halt_entre_blocos= True), "resultados/arquivo.s", token_linha)
+    #resultados.append(executarExpressao(tokens=token, resultados=[], memoria={}))
+    exibirResultados(resultados=resultados)
+    print("Expressão finalizada")
 
 if __name__ == "__main__":
     main()
