@@ -1,61 +1,62 @@
 
 from maquinaDeEstados import parseExpressao
 
-def executarExpressao(tokens, resultados, memoria):
+def executarExpressao(tokens_lista, resultados, memoria):
     # Avalia a expressão RPN representada por tokens
     pilha = []
     resultado = None
-    for token in tokens:
-        if token.tipo == 'NUMBER':
-            pilha.append(float(token.valor))
-        elif token.tipo == 'MEM':
-            nome = token.valor
-            if pilha:
-                # Há valor na pilha: armazenar na memória (WRITE)
-                memoria[nome] = pilha.pop()
-            elif nome in memoria:
-                # Pilha vazia: ler da memória (READ)
-                pilha.append(memoria[nome])
-            else:
-                raise ValueError(f"Variável '{nome}' não encontrada na memória.")
-        elif token.tipo == 'OP_ADD':
-            b = pilha.pop()
-            a = pilha.pop()
-            pilha.append(a + b)
-        elif token.tipo == 'OP_SUB':
-            b = pilha.pop()
-            a = pilha.pop()
-            pilha.append(a - b)
-        elif token.tipo == 'OP_MUL':
-            b = pilha.pop()
-            a = pilha.pop()
-            pilha.append(a * b)
-        elif token.tipo == 'OP_DIV':
-            b = pilha.pop()
-            a = pilha.pop()
-            pilha.append(a / b)
-        elif token.tipo == 'OP_INTDIV':
-            b = pilha.pop()
-            a = pilha.pop()
-            pilha.append(int(a // b))
-        elif token.tipo == 'OP_MOD':
-            b = pilha.pop()
-            a = pilha.pop()
-            pilha.append(int(a % b))
-        elif token.tipo == 'OP_POW':
-            b = pilha.pop()
-            a = pilha.pop()
-            pilha.append(a ** b)
-        elif token.tipo == 'KEYWORD_RES':
-            resultado = pilha[-1] if pilha else None
+    for tokens in tokens_lista:
+        for token in tokens:
+            if token.tipo == 'NUMBER':
+                pilha.append(float(token.valor))
+            elif token.tipo == 'MEM':
+                nome = token.valor
+                if pilha:
+                    # Há valor na pilha: armazenar na memória (WRITE)
+                    memoria[nome] = pilha.pop()
+                elif nome in memoria:
+                    # Pilha vazia: ler da memória (READ)
+                    pilha.append(memoria[nome])
+                else:
+                    raise ValueError(f"Variável '{nome}' não encontrada na memória.")
+            elif token.tipo == 'OP_ADD':
+                b = pilha.pop()
+                a = pilha.pop()
+                pilha.append(a + b)
+            elif token.tipo == 'OP_SUB':
+                b = pilha.pop()
+                a = pilha.pop()
+                pilha.append(a - b)
+            elif token.tipo == 'OP_MUL':
+                b = pilha.pop()
+                a = pilha.pop()
+                pilha.append(a * b)
+            elif token.tipo == 'OP_DIV':
+                b = pilha.pop()
+                a = pilha.pop()
+                pilha.append(a / b)
+            elif token.tipo == 'OP_INTDIV':
+                b = pilha.pop()
+                a = pilha.pop()
+                pilha.append(int(a // b))
+            elif token.tipo == 'OP_MOD':
+                b = pilha.pop()
+                a = pilha.pop()
+                pilha.append(int(a % b))
+            elif token.tipo == 'OP_POW':
+                b = pilha.pop()
+                a = pilha.pop()
+                pilha.append(a ** b)
+            elif token.tipo == 'KEYWORD_RES':
+                resultado = pilha[-1] if pilha else None
+                resultados.append(resultado)
+            elif token.tipo == 'LPAREN' or token.tipo == 'RPAREN':
+                # Parênteses são tratados no parser, ignorar aqui
+                continue
+        # Atualiza resultado final
+        if resultado is None and pilha:
+            resultado = pilha[-1]
             resultados.append(resultado)
-        elif token.tipo == 'LPAREN' or token.tipo == 'RPAREN':
-            # Parênteses são tratados no parser, ignorar aqui
-            continue
-    # Atualiza resultado final
-    if resultado is None and pilha:
-        resultado = pilha[-1]
-        resultados.append(resultado)
     return resultado
 
 # Funções de teste para execução de expressões e comandos especiais
