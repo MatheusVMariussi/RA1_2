@@ -4,60 +4,54 @@ from maquinaDeEstados import parseExpressao
 def executarExpressao(tokens_lista, resultados, memoria):
     # Avalia a expressão RPN representada por tokens
     pilha = []
-    resultado = None
+
     for tokens in tokens_lista:
         for token in tokens:
             if token.tipo == 'NUMBER':
                 pilha.append(float(token.valor))
+
             elif token.tipo == 'MEM':
                 nome = token.valor
                 if pilha:
-                    # Há valor na pilha: armazenar na memória (WRITE)
                     memoria[nome] = pilha.pop()
                 elif nome in memoria:
-                    # Pilha vazia: ler da memória (READ)
                     pilha.append(memoria[nome])
                 else:
-                    raise ValueError(f"Variável '{nome}' não encontrada na memória.")
-            elif token.tipo == 'OP_ADD':
+                    raise ValueError(f"Variável '{nome}' não encontrada.")
+
+            elif token.tipo in ('OP_ADD', 'OP_SUB', 'OP_MUL', 'OP_DIV',
+                                'OP_INTDIV', 'OP_MOD', 'OP_POW'):
+
+                if len(pilha) < 2:
+                    raise ValueError("Operandos insuficientes.")
+
                 b = pilha.pop()
                 a = pilha.pop()
-                pilha.append(a + b)
-            elif token.tipo == 'OP_SUB':
-                b = pilha.pop()
-                a = pilha.pop()
-                pilha.append(a - b)
-            elif token.tipo == 'OP_MUL':
-                b = pilha.pop()
-                a = pilha.pop()
-                pilha.append(a * b)
-            elif token.tipo == 'OP_DIV':
-                b = pilha.pop()
-                a = pilha.pop()
-                pilha.append(a / b)
-            elif token.tipo == 'OP_INTDIV':
-                b = pilha.pop()
-                a = pilha.pop()
-                pilha.append(int(a // b))
-            elif token.tipo == 'OP_MOD':
-                b = pilha.pop()
-                a = pilha.pop()
-                pilha.append(int(a % b))
-            elif token.tipo == 'OP_POW':
-                b = pilha.pop()
-                a = pilha.pop()
-                pilha.append(a ** b)
-            elif token.tipo == 'KEYWORD_RES':
-                resultado = pilha[-1] if pilha else None
-                resultados.append(resultado)
-            elif token.tipo == 'LPAREN' or token.tipo == 'RPAREN':
-                # Parênteses são tratados no parser, ignorar aqui
-                continue
-        # Atualiza resultado final
-        if resultado is None and pilha:
-            resultado = pilha[-1]
-            resultados.append(resultado)
-    return resultado
+
+                if token.tipo == 'OP_ADD':
+                    pilha.append(a + b)
+                elif token.tipo == 'OP_SUB':
+                    pilha.append(a - b)
+                elif token.tipo == 'OP_MUL':
+                    pilha.append(a * b)
+                elif token.tipo == 'OP_DIV':
+                    if b == 0:
+                        raise ValueError("Divisão por zero.")
+                    pilha.append(a / b)
+                elif token.tipo == 'OP_INTDIV':
+                    if b == 0:
+                        raise ValueError("Divisão inteira por zero.")
+                    pilha.append(int(a // b))
+                elif token.tipo == 'OP_MOD':
+                    if b == 0:
+                        raise ValueError("Módulo por zero.")
+                    pilha.append(int(a % b))
+                elif token.tipo == 'OP_POW':
+                    pilha.append(a ** b)
+        resultado = pilha[-1] if pilha else 0.0
+        resultados.append(resultado)
+
+    return resultados
 
 # Funções de teste para execução de expressões e comandos especiais
 def testar_executar_expressao():
