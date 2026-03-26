@@ -10,7 +10,10 @@ from testesAnalisadorLexico import testar_analisador_lexico
 from testesExecutarExpressao import testar_executar_expressao, executarExpressao
 from maquinaDeEstados import parseExpressao
 from token_class import salvar_tokens
+import os
 import re
+
+# TODO (serão implementados pelos outros membros do grupo)
 
 def lerArquivo(nomeArquivo):
     linhas = []
@@ -26,6 +29,7 @@ def lerArquivo(nomeArquivo):
 Gerador de código Assembly ARMv7 para expressões RPN.
 Compatível com CPUlator ARMv7 DE1-SoC (Cortex-A9, neon-fp16, softfp).
 """
+
 
 SEG7_DIGITS = [0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F]
 SEG7_BLANK  = 0x00
@@ -46,8 +50,6 @@ _MAPA_TIPO = {
     "OP_POW":  "^",
     "OP_INTDIV": "//",
     "OP_MOD":  "%",
-    "LPAREN": "(",
-    "RPAREN": ")",
 }
 
 def _token_para_str(tok) -> str:
@@ -125,6 +127,12 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
     """
     Compila uma expressão RPN em linhas de código (.text) usando o
     `estado` fornecido para contadores, constantes e memória.
+
+    Retorna (linhas_code, resultado_final) onde resultado_final é
+    {"reg": str, "kind": "float"|"int"}.
+
+    O `estado` é mutado: novos dados são acrescentados a estado.data,
+    o history é atualizado e os contadores avançam.
     """
 
     code  = []
@@ -158,7 +166,10 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         except: return False
 
     def is_mem(t):
-        return bool(re.fullmatch(r"[A-Z]+", t)) and t != "RES"
+        # Verifica se o token é uma variável de memória:
+        # apenas letras maiúsculas (A-Z), sem dígitos nem símbolos, e não é "RES".
+        # t.isalpha() → somente letras; t.isupper() → todas maiúsculas.
+        return bool(t) and t.isalpha() and t.isupper() and t != "RES"
 
     def const_label(value_str):
         if value_str not in estado.const_pool:
@@ -178,8 +189,41 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         return f"s{2 * n}"
 
     def double_to_int(dn: str, rn: str):
-        note(f"double→int: {dn} → {rn}")
-        emit(f"    VCVT.S32.F64 s28, {dn}")
+        """
+        Conversão segura de double → int com arredondamento.
+        NÃO altera o registrador original.
+        """
+
+        lbl_half = const_label("0.5")
+
+        note(f"double→int seguro: {dn} → {rn}")
+
+        # usa registrador temporário (não sobrescreve dn)
+        emit(f"    VMOV.F64    d30, {dn}")
+
+        # carrega 0.5
+        emit(f"    LDR         r12, ={lbl_half}")
+        emit(f"    VLDR        d31, [r12]")
+
+        # verifica sinal
+        emit(f"    VCMP.F64    d30, #0")
+        emit(f"    VMRS        APSR_nzcv, FPSCR")
+
+        lbl_neg = new_label("ROUND_NEG")
+        lbl_end = new_label("ROUND_END")
+
+        emit(f"    BLT         {lbl_neg}")
+
+        # positivo → +0.5
+        emit(f"    VADD.F64    d30, d30, d31")
+        emit(f"    B           {lbl_end}")
+
+        # negativo → -0.5
+        emit(f"{lbl_neg}:")
+        emit(f"    VSUB.F64    d30, d30, d31")
+
+        emit(f"{lbl_end}:")
+        emit(f"    VCVT.S32.F64 s28, d30")
         emit(f"    VMOV         {rn}, s28")
 
     def fpu_idiv(da, db, dr, rr):
@@ -355,179 +399,102 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
             stack.append(result)
             estado.history.insert(0, result)
 
-    def emit_seven_seg_int(val_reg: str, n_digitos: int = 6):
-        """
-        Exibe o inteiro em val_reg nos primeiros n_digitos displays
-        (HEX0 = dígito menos significativo).
-        Registradores de trabalho: r0-r7 (scratch da rotina de display).
-        """
-        lbl_pos  = new_label("SEG_POS")
-        lbl_loop = new_label("SEG_LOOP")
-        lbl_done = new_label("SEG_DONE")
-        lbl_hi   = new_label("SEG_HI")
-        lbl_next = new_label("SEG_NEXT")
 
-        rV   = "r0"
-        rB   = "r1"
-        rD   = "r2"
-        rSeg = "r3"
-        rA   = "r4"
-        rTmp = "r5"
-        rIdx = "r6"
+    def emit_seven_seg(val, kind="int"):
+        val_reg  = val["reg"]
+        val_kind = val["kind"]
 
-        emit(f"    MOV     {rV}, {val_reg}")
-        note("limpa HEX0-HEX3 e HEX4-HEX5")
-        emit(f"    LDR     {rA}, =0xFF200020")
-        emit(f"    MOV     {rTmp}, #0")
-        emit(f"    STR     {rTmp}, [{rA}]")
-        emit(f"    LDR     {rA}, =0xFF200030")
-        emit(f"    STR     {rTmp}, [{rA}]")
-        note("testa sinal")
-        emit(f"    CMP     {rV}, #0")
-        emit(f"    BGE     {lbl_pos}")
-        note("negativo: abs e traço em HEX5")
-        emit(f"    RSB     {rV}, {rV}, #0")
-        emit(f"    LDR     {rA}, =0xFF200030")
-        emit(f"    MOV     {rTmp}, #0x40")
-        emit(f"    LSL     {rTmp}, {rTmp}, #8")
-        emit(f"    STR     {rTmp}, [{rA}]")
-        emit(f"{lbl_pos}:")
-        emit(f"    LDR     {rB}, =SEG7_TABLE")
-        emit(f"    MOV     {rIdx}, #0")
-        emit(f"{lbl_loop}:")
-        emit(f"    CMP     {rIdx}, #{n_digitos}")
-        emit(f"    BGE     {lbl_done}")
-        lbl_ten = const_label("10.0")
-        note("extrai próximo dígito via FPU")
-        emit(f"    VMOV         s30, {rV}")
-        emit(f"    VCVT.F64.S32 d15, s30")
-        emit(f"    LDR          {rTmp}, ={lbl_ten}")
-        emit(f"    VLDR         d14, [{rTmp}]")
-        emit(f"    VDIV.F64     d15, d15, d14")
-        emit(f"    VCVT.S32.F64 s30, d15")
-        emit(f"    VMOV         {rTmp}, s30")
-        emit(f"    MOV     r7, #10")
-        emit(f"    MUL     {rD}, {rTmp}, r7")
-        emit(f"    SUB     {rD}, {rV}, {rD}")
-        emit(f"    MOV     {rV}, {rTmp}")
-        emit(f"    LDRB    {rSeg}, [{rB}, {rD}]")
-        note("empacota dígito no display correto")
-        emit(f"    CMP     {rIdx}, #4")
-        emit(f"    BGE     {lbl_hi}")
-        emit(f"    MOV     {rTmp}, {rIdx}")
-        emit(f"    LSL     {rTmp}, {rTmp}, #3")
-        emit(f"    LSL     {rSeg}, {rSeg}, {rTmp}")
-        emit(f"    LDR     {rA}, =0xFF200020")
-        emit(f"    LDR     {rTmp}, [{rA}]")
-        emit(f"    ORR     {rTmp}, {rTmp}, {rSeg}")
-        emit(f"    STR     {rTmp}, [{rA}]")
-        emit(f"    B       {lbl_next}")
-        emit(f"{lbl_hi}:")
-        emit(f"    SUB     {rTmp}, {rIdx}, #4")
-        emit(f"    LSL     {rTmp}, {rTmp}, #3")
-        emit(f"    LSL     {rSeg}, {rSeg}, {rTmp}")
-        emit(f"    LDR     {rA}, =0xFF200030")
-        emit(f"    LDR     {rTmp}, [{rA}]")
-        emit(f"    ORR     {rTmp}, {rTmp}, {rSeg}")
-        emit(f"    STR     {rTmp}, [{rA}]")
-        emit(f"{lbl_next}:")
-        emit(f"    ADD     {rIdx}, {rIdx}, #1")
-        emit(f"    CMP     {rV}, #0")
-        emit(f"    BNE     {lbl_loop}")
-        emit(f"{lbl_done}:")
+        rWork  = "r10"
+        rDiv   = "r3"
+        rQuo   = "r4"
+        rRem   = "r5"
+        rPos   = "r6"
+        rShift = "r7"
+        rSeg   = "r2"
+        rTmp   = "r8"
+        rDisp  = "r11"
 
-    def emit_seven_seg(final: dict):
-        """
-        Despacha para a rotina de display correta conforme o tipo do resultado.
+        lbl_loop = new_label("seg_loop")
 
-        int  → 6 dígitos inteiros em HEX0–HEX5  (comportamento original)
-        float→ Layout:
-                 HEX0–HEX2 : 2 casas decimais  (dígitos menos significativos)
-                 HEX3      : 1º dígito da parte inteira + ponto decimal (bit 7)
-                 HEX4–HEX5 : restante da parte inteira / sinal
-               Estratégia: multiplica o double por 100, trunca para inteiro
-               e exibe os 5 dígitos resultantes em HEX0–HEX4; o ponto decimal
-               é aceso no bit 7 de HEX2 (separador entre casas decimais e inteiro).
-        """
-        note("=== seven segment display ===")
+        # -----------------------------------
+        # FLOAT → escala por 10
+        # -----------------------------------
+        if val_kind == "float":
+            lbl_10 = const_label("10.0")
 
-        if final["kind"] == "int":
-            # Caminho original — inteiro direto
-            int_res = to_int(final)
-            note(f"exibe inteiro {int_res['reg']}")
-            emit_seven_seg_int(int_res["reg"], n_digitos=6)
+            emit(f"    LDR     r12, ={lbl_10}")
+            emit(f"    VLDR    d31, [r12]")
+            emit(f"    VMUL.F64 d30, {val_reg}, d31")
 
+            double_to_int("d30", rWork)
         else:
-            # Float: multiplica por 100 para obter 2 casas decimais como inteiro
-            lbl_100  = const_label("100.0")
-            lbl_pos  = new_label("SEGF_POS")
-            rTmp     = "r5"
-            rA       = "r4"
-            rInteiro = "r0"   # resultado × 100 truncado (parte inteira + 2 dec)
-            rSinal   = "r1"   # 1 se negativo, 0 se positivo
+            emit(f"    MOV     {rWork}, {val_reg}")
 
-            d_orig = final["reg"]       # d-reg com o valor original
-            d_x100 = "d15"              # scratch: valor × 100
+        # -----------------------------------
+        # INIT (CORRIGIDO - ACTIVE HIGH)
+        # -----------------------------------
+        emit(f"    MOV     {rDisp}, #0")   # display apagado
+        emit(f"    MOV     {rPos}, #0")
 
-            note(f"float → display: {d_orig} × 100 → inteiro com 2 casas decimais")
+        emit(f"{lbl_loop}:")
 
-            # Limpa displays
-            emit(f"    LDR     {rA}, =0xFF200020")
-            emit(f"    MOV     {rTmp}, #0")
-            emit(f"    STR     {rTmp}, [{rA}]")
-            emit(f"    LDR     {rA}, =0xFF200030")
-            emit(f"    STR     {rTmp}, [{rA}]")
+        # divisão por 10
+        emit(f"    MOV     {rDiv}, #10")
+        emit(f"    MOV     {rQuo}, #0")
+        emit(f"    MOV     {rRem}, {rWork}")
 
-            # Detecta sinal e trabalha com valor absoluto
-            note("detecta sinal")
-            emit(f"    VCMP.F64    {d_orig}, #0")
-            emit(f"    VMRS        APSR_nzcv, FPSCR")
-            emit(f"    MOV         {rSinal}, #0")
-            emit(f"    BGE         {lbl_pos}")
-            note("negativo: inverte e marca sinal")
-            emit(f"    VNEG.F64    d14, {d_orig}")   # d14 = abs(valor)
-            emit(f"    MOV         {rSinal}, #1")
-            emit(f"    B           {lbl_pos}+4")     # pula o VMOV abaixo
-            emit(f"{lbl_pos}:")
-            emit(f"    VMOV        d14, {d_orig}")   # d14 = valor (positivo)
+        lbl_div = new_label("div_loop")
+        lbl_div_end = new_label("div_end")
 
-            # Multiplica por 100 e trunca
-            note("multiplica por 100 e trunca")
-            emit(f"    LDR         {rTmp}, ={lbl_100}")
-            emit(f"    VLDR        {d_x100}, [{rTmp}]")
-            emit(f"    VMUL.F64    {d_x100}, d14, {d_x100}")
-            emit(f"    VCVT.S32.F64 s28, {d_x100}")
-            emit(f"    VMOV        {rInteiro}, s28")   # rInteiro = trunc(|x| * 100)
+        emit(f"{lbl_div}:")
+        emit(f"    CMP     {rRem}, {rDiv}")
+        emit(f"    BLT     {lbl_div_end}")
+        emit(f"    SUB     {rRem}, {rRem}, {rDiv}")
+        emit(f"    ADD     {rQuo}, {rQuo}, #1")
+        emit(f"    B       {lbl_div}")
 
-            # Exibe os 5 dígitos em HEX0–HEX4 (2 decimais + até 3 inteiros)
-            note("exibe 5 dígitos: HEX0-HEX1=casas decimais, HEX2-HEX4=parte inteira")
-            emit_seven_seg_int(rInteiro, n_digitos=5)
+        emit(f"{lbl_div_end}:")
 
-            # Acende o ponto decimal no bit 7 de HEX2
-            # HEX2 está nos bits [23:16] do registrador 0xFF200020
-            note("acende ponto decimal em HEX2 (bit 7 = 0x80, posição 16)")
-            emit(f"    LDR     {rA}, =0xFF200020")
-            emit(f"    LDR     {rTmp}, [{rA}]")
-            emit(f"    MOV     r6, #0x80")
-            emit(f"    LSL     r6, r6, #16")          # posiciona em HEX2
-            emit(f"    ORR     {rTmp}, {rTmp}, r6")
-            emit(f"    STR     {rTmp}, [{rA}]")
+        # converte dígito
+        emit(f"    MOV     r0, {rRem}")
+        emit(f"    BL      digit_to_7seg")
+        emit(f"    MOV     {rSeg}, r0")
 
-            # Exibe sinal negativo em HEX5 se necessário
-            lbl_pos_sinal = new_label("SEGF_SKIP_SINAL")
-            note("sinal negativo em HEX5")
-            emit(f"    CMP         {rSinal}, #0")
-            emit(f"    BEQ         {lbl_pos_sinal}")
-            emit(f"    LDR         {rA}, =0xFF200030")
-            emit(f"    LDR         {rTmp}, [{rA}]")
-            emit(f"    MOV         r6, #0x40")
-            emit(f"    LSL         r6, r6, #8")        # posiciona em HEX5
-            emit(f"    ORR         {rTmp}, {rTmp}, r6")
-            emit(f"    STR         {rTmp}, [{rA}]")
-            emit(f"{lbl_pos_sinal}:")
+        # -----------------------------------
+        # PONTO DECIMAL (CORRIGIDO)
+        # -----------------------------------
+        if val_kind == "float":
+            emit(f"    CMP     {rPos}, #0")
+            emit(f"    BNE     no_dot_{lbl_loop}")
+            emit(f"    ORR     {rSeg}, {rSeg}, #0x80")  # liga ponto (ACTIVE HIGH)
+            emit(f"no_dot_{lbl_loop}:")
 
-        note("=== display atualizado ===")
+        # -----------------------------------
+        # SHIFT DO DÍGITO
+        # -----------------------------------
+        emit(f"    MOV     {rShift}, {rPos}")
+        emit(f"    ADD     {rShift}, {rShift}, {rShift}")
+        emit(f"    ADD     {rShift}, {rShift}, {rShift}")
+        emit(f"    ADD     {rShift}, {rShift}, {rShift}")
 
+        emit(f"    MOV     {rTmp}, {rSeg}")
+        emit(f"    LSL     {rTmp}, {rTmp}, {rShift}")
+
+        # -----------------------------------
+        # ACUMULA NO DISPLAY (CORRIGIDO)
+        # -----------------------------------
+        emit(f"    ORR     {rDisp}, {rDisp}, {rTmp}")
+
+        # próximo dígito
+        emit(f"    MOV     {rWork}, {rQuo}")
+        emit(f"    ADD     {rPos}, {rPos}, #1")
+
+        emit(f"    CMP     {rWork}, #0")
+        emit(f"    BNE     {lbl_loop}")
+
+        # escreve no display
+        emit(f"    LDR     r0, =0xFF200020")
+        emit(f"    STR     {rDisp}, [r0]")
     # ------------------------------------------------------------------
     # Loop principal do bloco
     # ------------------------------------------------------------------
@@ -691,6 +658,7 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
             todos_code.append(f"    BKPT    #0   @ pausa — fim do bloco {idx} (Continue no CPUlator para prosseguir)")
 
         todos_code.append("")  # linha em branco entre blocos
+
     # SEG7_TABLE declarada uma única vez no .data compartilhado
     estado.data.append("")
     estado.data.append("@ gfedcba: dígitos 0-9")
@@ -715,6 +683,14 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
         "",
     ] + todos_code + [
         "    B   .   @ halt",
+        "",
+        "@ -------- função auxiliar --------",
+        "digit_to_7seg:",
+        "    PUSH {r1, lr}",
+        "    LDR  r1, =SEG7_TABLE",
+        "    LDRB r0, [r1, r0]",
+        "    POP  {r1, lr}",
+        "    BX   lr",
     ]
 
     return "\n".join(partes)
