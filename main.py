@@ -11,6 +11,7 @@ from testesExecutarExpressao import testar_executar_expressao, executarExpressao
 from maquinaDeEstados import parseExpressao
 from token_class import salvar_tokens
 import os
+import re
 
 # TODO (serão implementados pelos outros membros do grupo)
 
