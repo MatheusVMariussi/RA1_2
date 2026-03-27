@@ -194,39 +194,12 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
 
     def double_to_int(dn: str, rn: str):
         """
-        Conversão segura de double → int com arredondamento.
-        NÃO altera o registrador original.
+        Conversão double → int (TRUNCAMENTO, sem arredondar)
         """
 
-        lbl_half = const_label("0.5")
+        note(f"double→int (truncate): {dn} → {rn}")
 
-        note(f"double→int seguro: {dn} → {rn}")
-
-        # usa registrador temporário (não sobrescreve dn)
         emit(f"    VMOV.F64    d30, {dn}")
-
-        # carrega 0.5
-        emit(f"    LDR         r12, ={lbl_half}")
-        emit(f"    VLDR        d31, [r12]")
-
-        # verifica sinal
-        emit(f"    VCMP.F64    d30, #0")
-        emit(f"    VMRS        APSR_nzcv, FPSCR")
-
-        lbl_neg = new_label("ROUND_NEG")
-        lbl_end = new_label("ROUND_END")
-
-        emit(f"    BLT         {lbl_neg}")
-
-        # positivo → +0.5
-        emit(f"    VADD.F64    d30, d30, d31")
-        emit(f"    B           {lbl_end}")
-
-        # negativo → -0.5
-        emit(f"{lbl_neg}:")
-        emit(f"    VSUB.F64    d30, d30, d31")
-
-        emit(f"{lbl_end}:")
         emit(f"    VCVT.S32.F64 s28, d30")
         emit(f"    VMOV         {rn}, s28")
 
