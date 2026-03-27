@@ -31,6 +31,10 @@ SEG7_DIGITS = [0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F]
 SEG7_BLANK  = 0x00
 SEG7_MINUS  = 0x40
 
+UART_BASE   = 0xFF201000
+UART_DATA   = UART_BASE
+UART_CTRL   = UART_BASE + 0x4
+
 # ---------------------------------------------------------------------------
 # Conversão Token → str
 # ---------------------------------------------------------------------------
@@ -190,39 +194,12 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
 
     def double_to_int(dn: str, rn: str):
         """
-        Conversão segura de double → int com arredondamento.
-        NÃO altera o registrador original.
+        Conversão double → int (TRUNCAMENTO, sem arredondar)
         """
 
-        lbl_half = const_label("0.5")
+        note(f"double→int (truncate): {dn} → {rn}")
 
-        note(f"double→int seguro: {dn} → {rn}")
-
-        # usa registrador temporário (não sobrescreve dn)
         emit(f"    VMOV.F64    d30, {dn}")
-
-        # carrega 0.5
-        emit(f"    LDR         r12, ={lbl_half}")
-        emit(f"    VLDR        d31, [r12]")
-
-        # verifica sinal
-        emit(f"    VCMP.F64    d30, #0")
-        emit(f"    VMRS        APSR_nzcv, FPSCR")
-
-        lbl_neg = new_label("ROUND_NEG")
-        lbl_end = new_label("ROUND_END")
-
-        emit(f"    BLT         {lbl_neg}")
-
-        # positivo → +0.5
-        emit(f"    VADD.F64    d30, d30, d31")
-        emit(f"    B           {lbl_end}")
-
-        # negativo → -0.5
-        emit(f"{lbl_neg}:")
-        emit(f"    VSUB.F64    d30, d30, d31")
-
-        emit(f"{lbl_end}:")
         emit(f"    VCVT.S32.F64 s28, d30")
         emit(f"    VMOV         {rn}, s28")
 
@@ -404,176 +381,29 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
             estado.history.insert(0, result)
 
 
+
     def emit_seven_seg(val, kind="int"):
+        """
+        Saída via JTAG UART.
+        Inteiros são impressos em 64 bits; floats com 1 casa decimal.
+        """
         val_reg  = val["reg"]
         val_kind = val["kind"]
 
-        # Registradores de trabalho
-        rCnt   = "r1"   # contador de dígitos emitidos
-        rSeg   = "r2"   # código do dígito 7-seg
-        rDiv   = "r3"   # divisor 10
-        rQuo   = "r4"   # quociente
-        rRem   = "r5"   # resto
-        rPos   = "r6"   # posição do dígito no display
-        rShift = "r7"   # shift = pos * 8
-        rTmp   = "r8"   # temporário
-        rNeg   = "r9"   # flag de sinal
-        rWork  = "r10"  # valor inteiro em processamento
-        rLo    = "r11"  # HEX0-HEX3
-        rHi    = "r12"  # HEX4-HEX5
+        note("=== JTAG UART output ===")
 
-        lbl_abs          = new_label("SEG_ABS")
-        lbl_after_abs    = new_label("SEG_AFTER_ABS")
-        lbl_skip_sign    = new_label("SEG_SKIP_SIGN")
-        lbl_loop         = new_label("SEG_LOOP")
-        lbl_div          = new_label("SEG_DIV")
-        lbl_div_end      = new_label("SEG_DIV_END")
-        lbl_no_dot       = new_label("SEG_NODOT")
-        lbl_write_low    = new_label("SEG_WRITE_LOW")
-        lbl_after_write  = new_label("SEG_AFTER_WRITE")
-        lbl_done         = new_label("SEG_DONE")
-
-        # ------------------------------------------------------------
-        # 1) Prepara o valor absoluto em rWork
-        #    - float: usa |valor| * 10 e arredonda para inteiro
-        #    - int: usa |valor|
-        #    Também guarda se o valor era negativo em rNeg.
-        # ------------------------------------------------------------
         if val_kind == "float":
-            lbl_10 = const_label("10.0")
-
-            emit(f"    VCMP.F64    {val_reg}, #0")
-            emit(f"    VMRS        APSR_nzcv, FPSCR")
-            emit(f"    MOV         {rNeg}, #0")
-            emit(f"    BGE         {lbl_abs}")
-            emit(f"    VNEG.F64    d14, {val_reg}")
-            emit(f"    MOV         {rNeg}, #1")
-            emit(f"    B           {lbl_after_abs}")
-            emit(f"{lbl_abs}:")
-            emit(f"    VMOV.F64    d14, {val_reg}")
-            emit(f"{lbl_after_abs}:")
-            emit(f"    LDR         r0, ={lbl_10}")
-            emit(f"    VLDR        d15, [r0]")
-            emit(f"    VMUL.F64    d15, d14, d15")
-            double_to_int("d15", rWork)
-
-            min_digits = 2   # float precisa mostrar pelo menos "0.x"
+            emit(f"    VMOV.F64    d0, {val_reg}")
+            emit(f"    BL          uart_print_float1")
         else:
-            emit(f"    MOV         {rWork}, {val_reg}")
-            emit(f"    MOV         {rNeg}, #0")
-            emit(f"    CMP         {rWork}, #0")
-            emit(f"    BGE         {lbl_abs}")
-            emit(f"    RSB         {rWork}, {rWork}, #0")
-            emit(f"    MOV         {rNeg}, #1")
-            emit(f"{lbl_abs}:")
-            min_digits = 1
+            emit(f"    MOV         r0, {val_reg}")
+            emit(f"    ASR         r1, r0, #31")
+            emit(f"    BL          uart_print_int64")
 
-        # ------------------------------------------------------------
-        # 2) Inicializa os dois words do display
-        # ------------------------------------------------------------
-        emit(f"    MOV         {rLo}, #0")   # HEX0-HEX3
-        emit(f"    MOV         {rHi}, #0")   # HEX4-HEX5
-        emit(f"    MOV         {rCnt}, #0")
-        emit(f"    MOV         {rPos}, #0")
-
-        # Se for negativo, coloca '-' em HEX5 (active high: 0x40)
-        emit(f"    CMP         {rNeg}, #0")
-        emit(f"    BEQ         {lbl_skip_sign}")
-        emit(f"    MOV         {rTmp}, #0x40")
-        emit(f"    LSL         {rTmp}, {rTmp}, #8")   # HEX5
-        emit(f"    ORR         {rHi}, {rHi}, {rTmp}")
-        emit(f"{lbl_skip_sign}:")
-
-        # ------------------------------------------------------------
-        # 3) Loop de extração e escrita dos dígitos
-        #    - até 6 dígitos se positivo
-        #    - até 5 dígitos se negativo (HEX5 é o sinal)
-        #    - float mantém pelo menos 2 dígitos para mostrar 0.x
-        # ------------------------------------------------------------
-        emit(f"{lbl_loop}:")
-
-        # Limite máximo de dígitos visíveis
-        emit(f"    CMP         {rNeg}, #0")
-        emit(f"    MOVEQ       {rTmp}, #6")
-        emit(f"    MOVNE       {rTmp}, #5")
-        emit(f"    CMP         {rCnt}, {rTmp}")
-        emit(f"    BGE         {lbl_done}")
-
-        # divisor = 10
-        emit(f"    MOV         {rDiv}, #10")
-        emit(f"    MOV         {rQuo}, #0")
-        emit(f"    MOV         {rRem}, {rWork}")
-
-        # divisão manual por 10
-        emit(f"{lbl_div}:")
-        emit(f"    CMP         {rRem}, {rDiv}")
-        emit(f"    BLT         {lbl_div_end}")
-        emit(f"    SUB         {rRem}, {rRem}, {rDiv}")
-        emit(f"    ADD         {rQuo}, {rQuo}, #1")
-        emit(f"    B           {lbl_div}")
-        emit(f"{lbl_div_end}:")
-
-        # converte o dígito atual
-        emit(f"    MOV         r0, {rRem}")
-        emit(f"    BL          digit_to_7seg")
-        emit(f"    MOV         {rSeg}, r0")
-
-        # ponto decimal: para float, o ponto fica no dígito da posição 1
-        # (ex.: 12.3 => dígitos 3,2,1 e ponto no "2")
-        if val_kind == "float":
-            emit(f"    CMP         {rPos}, #1")
-            emit(f"    BNE         {lbl_no_dot}")
-            emit(f"    ORR         {rSeg}, {rSeg}, #0x80")
-            emit(f"{lbl_no_dot}:")
-
-        # posição -> deslocamento em bytes (8 bits por display)
-        emit(f"    MOV         {rShift}, {rPos}")
-        emit(f"    ADD         {rShift}, {rShift}, {rShift}")
-        emit(f"    ADD         {rShift}, {rShift}, {rShift}")
-        emit(f"    ADD         {rShift}, {rShift}, {rShift}")
-
-        emit(f"    MOV         {rTmp}, {rSeg}")
-        emit(f"    LSL         {rTmp}, {rTmp}, {rShift}")
-
-        # escreve em HEX0-HEX3 ou HEX4-HEX5
-        emit(f"    CMP         {rPos}, #3")
-        emit(f"    BGT         {lbl_write_low}")
-
-        # HEX0-HEX3 -> rLo
-        emit(f"    ORR         {rLo}, {rLo}, {rTmp}")
-        emit(f"    B           {lbl_after_write}")
-
-        # HEX4-HEX5 -> rHi
-        emit(f"{lbl_write_low}:")
-        emit(f"    SUB         {rShift}, {rPos}, #4")
-        emit(f"    MOV         {rTmp}, {rSeg}")
-        emit(f"    MOV         r0, {rShift}")
-        emit(f"    ADD         r0, r0, r0")
-        emit(f"    ADD         r0, r0, r0")
-        emit(f"    ADD         r0, r0, r0")
-        emit(f"    LSL         {rTmp}, {rTmp}, r0")
-        emit(f"    ORR         {rHi}, {rHi}, {rTmp}")
-
-        emit(f"{lbl_after_write}:")
-        emit(f"    MOV         {rWork}, {rQuo}")
-        emit(f"    ADD         {rCnt}, {rCnt}, #1")
-        emit(f"    ADD         {rPos}, {rPos}, #1")
-
-        # continua enquanto ainda houver valor ou enquanto não atingir o mínimo
-        emit(f"    CMP         {rWork}, #0")
-        emit(f"    BNE         {lbl_loop}")
-        emit(f"    CMP         {rCnt}, #{min_digits}")
-        emit(f"    BLT         {lbl_loop}")
-
-        # ------------------------------------------------------------
-        # 4) Escreve nos dois registradores do display
-        # ------------------------------------------------------------
-        emit(f"{lbl_done}:")
-        emit(f"    LDR         r0, =0xFF200020")
-        emit(f"    STR         {rLo}, [r0]")
-        emit(f"    LDR         r0, =0xFF200030")
-        emit(f"    STR         {rHi}, [r0]")
+        emit(f"    MOV         r0, #10")
+        emit(f"    BL          uart_putc")
     # ------------------------------------------------------------------
+
     # Loop principal do bloco
     # ------------------------------------------------------------------
     i = 0
@@ -675,6 +505,10 @@ def gerarAssembly(tokens: list) -> str:
     estado.data.append(f"             .byte 0x{SEG7_BLANK:02X}   @ vazio")
     estado.data.append(f"             .byte 0x{SEG7_MINUS:02X}   @ traço")
     estado.data.append("             .align 2")
+    estado.data.append("")
+    estado.data.append("@ uart constants")
+    estado.data.append("UART_FLOAT10:  .double 10.0")
+    estado.data.append("UART_HALF:     .double 0.5")
 
     partes = [
         "@ Gerado automaticamente — ARMv7 DE1-SoC (CPUlator)",
@@ -692,8 +526,138 @@ def gerarAssembly(tokens: list) -> str:
         "",
         f"    @ resultado final em {final['reg']} ({final['kind']})",
         "    B   .   @ halt",
-    ]
-
+        "",
+        "",
+        "@ -------- UART helpers --------",
+        "uart_putc:",
+        "    PUSH {r1, r2, lr}",
+        "    LDR  r1, =0xFF201000",
+        "uart_putc_wait:",
+        "    LDR  r2, [r1, #4]",
+        "    LSR  r2, r2, #16",
+        "    BEQ  uart_putc_wait",
+        "    STRB r0, [r1]",
+        "    POP  {r1, r2, lr}",
+        "    BX   lr",
+        "",
+        "uart_udivmod10_u64:",
+        "    PUSH {r3-r9, lr}",
+        "    MOV  r3, #0",
+        "    MOV  r4, #0",
+        "    MOV  r5, #0",
+        "    MOV  r6, r0",
+        "    MOV  r7, r1",
+        "    MOV  r8, #64",
+        "uart_udivmod10_u64_loop:",
+        "    MOV  r9, r7, LSR #31",
+        "    LSLS r6, r6, #1",
+        "    ADC  r7, r7, r7",
+        "    LSLS r3, r3, #1",
+        "    ADC  r4, r4, r4",
+        "    ADD  r5, r5, r5",
+        "    ADD  r5, r5, r9",
+        "    CMP  r5, #10",
+        "    SUBCS r5, r5, #10",
+        "    ORRCS r3, r3, #1",
+        "    SUBS r8, r8, #1",
+        "    BNE  uart_udivmod10_u64_loop",
+        "    MOV  r0, r3",
+        "    MOV  r1, r4",
+        "    MOV  r2, r5",
+        "    POP  {r3-r9, lr}",
+        "    BX   lr",
+        "",
+        "uart_print_u64:",
+        "    PUSH {r4, r5, r6, r7, lr}",
+        "    CMP  r1, #0",
+        "    BNE  uart_print_u64_rec",
+        "    CMP  r0, #10",
+        "    BLT  uart_print_u64_digit",
+        "uart_print_u64_rec:",
+        "    BL   uart_udivmod10_u64",
+        "    MOV  r4, r2",
+        "    MOV  r5, r0",
+        "    MOV  r6, r1",
+        "    MOV  r0, r5",
+        "    MOV  r1, r6",
+        "    BL   uart_print_u64",
+        "    MOV  r0, r4",
+        "    ADD  r0, r0, #'0'",
+        "    BL   uart_putc",
+        "    POP  {r4, r5, r6, r7, lr}",
+        "    BX   lr",
+        "uart_print_u64_digit:",
+        "    ADD  r0, r0, #'0'",
+        "    BL   uart_putc",
+        "    POP  {r4, r5, r6, r7, lr}",
+        "    BX   lr",
+        "",
+        "uart_print_int64:",
+        "    PUSH {r4, r5, r6, r7, lr}",
+        "    MOV  r4, r0",
+        "    MOV  r5, r1",
+        "    CMP  r5, #0",
+        "    BGE  uart_print_int64_pos",
+        "    MOV  r0, #'-'",
+        "    BL   uart_putc",
+        "    RSBS r4, r4, #0",
+        "    RSC  r5, r5, #0",
+        "uart_print_int64_pos:",
+        "    MOV  r0, r4",
+        "    MOV  r1, r5",
+        "    BL   uart_print_u64",
+        "    POP  {r4, r5, r6, r7, lr}",
+        "    BX   lr",
+        "",
+        "uart_print_int:",
+        "    ASR  r1, r0, #31",
+        "    B    uart_print_int64",
+        "",
+        "uart_print_float1:",
+        "    PUSH {r4, r5, r6, r7, lr}",
+        "    VCMP.F64    d0, #0",
+        "    VMRS        APSR_nzcv, FPSCR",
+        "    MOV         r4, #0",
+        "    BGE         uart_float_abs_ok",
+        "    MOV         r4, #1",
+        "    VNEG.F64    d0, d0",
+        "uart_float_abs_ok:",
+        "    LDR         r5, =UART_FLOAT10",
+        "    VLDR        d1, [r5]",
+        "    VMUL.F64    d0, d0, d1",
+        "    LDR         r5, =UART_HALF",
+        "    VLDR        d1, [r5]",
+        "    VADD.F64    d0, d0, d1",
+        "    VCVT.S32.F64 s0, d0",
+        "    VMOV        r0, s0",
+        "    MOV         r1, #0",
+        "    BL          uart_udivmod10_u64",
+        "    MOV         r5, r0",
+        "    MOV         r6, r1",
+        "    MOV         r7, r2",
+        "    CMP         r4, #0",
+        "    BEQ         uart_float_print_num",
+        "    MOV         r0, #'-'",
+        "    BL          uart_putc",
+        "uart_float_print_num:",
+        "    MOV         r0, r5",
+        "    MOV         r1, r6",
+        "    BL          uart_print_u64",
+        "    MOV         r0, #'.'",
+        "    BL          uart_putc",
+        "    ADD         r0, r7, #'0'",
+        "    BL          uart_putc",
+        "    POP         {r4, r5, r6, r7, lr}",
+        "    BX          lr",
+        "",
+        "@ -------- função auxiliar --------",
+        "digit_to_7seg:",
+        "    PUSH {r1, lr}",
+        "    LDR  r1, =SEG7_TABLE",
+        "    LDRB r0, [r1, r0]",
+        "    POP  {r1, lr}",
+        "    BX   lr",]
+    
     return "\n".join(partes)
 
 
@@ -745,6 +709,10 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
     estado.data.append(f"             .byte 0x{SEG7_BLANK:02X}   @ vazio")
     estado.data.append(f"             .byte 0x{SEG7_MINUS:02X}   @ traço")
     estado.data.append("             .align 2")
+    estado.data.append("")
+    estado.data.append("@ uart constants")
+    estado.data.append("UART_FLOAT10:  .double 10.0")
+    estado.data.append("UART_HALF:     .double 0.5")
 
     partes = [
         "@ Gerado automaticamente — ARMv7 DE1-SoC (CPUlator)",
@@ -762,16 +730,139 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
     ] + todos_code + [
         "    B   .   @ halt",
         "",
+        "",
+        "@ -------- UART helpers --------",
+        "uart_putc:",
+        "    PUSH {r1, r2, lr}",
+        "    LDR  r1, =0xFF201000",
+        "uart_putc_wait:",
+        "    LDR  r2, [r1, #4]",
+        "    LSR  r2, r2, #16",
+        "    BEQ  uart_putc_wait",
+        "    STRB r0, [r1]",
+        "    POP  {r1, r2, lr}",
+        "    BX   lr",
+        "",
+        "uart_udivmod10_u64:",
+        "    PUSH {r3-r9, lr}",
+        "    MOV  r3, #0",
+        "    MOV  r4, #0",
+        "    MOV  r5, #0",
+        "    MOV  r6, r0",
+        "    MOV  r7, r1",
+        "    MOV  r8, #64",
+        "uart_udivmod10_u64_loop:",
+        "    MOV  r9, r7, LSR #31",
+        "    LSLS r6, r6, #1",
+        "    ADC  r7, r7, r7",
+        "    LSLS r3, r3, #1",
+        "    ADC  r4, r4, r4",
+        "    ADD  r5, r5, r5",
+        "    ADD  r5, r5, r9",
+        "    CMP  r5, #10",
+        "    SUBCS r5, r5, #10",
+        "    ORRCS r3, r3, #1",
+        "    SUBS r8, r8, #1",
+        "    BNE  uart_udivmod10_u64_loop",
+        "    MOV  r0, r3",
+        "    MOV  r1, r4",
+        "    MOV  r2, r5",
+        "    POP  {r3-r9, lr}",
+        "    BX   lr",
+        "",
+        "uart_print_u64:",
+        "    PUSH {r4, r5, r6, r7, lr}",
+        "    CMP  r1, #0",
+        "    BNE  uart_print_u64_rec",
+        "    CMP  r0, #10",
+        "    BLT  uart_print_u64_digit",
+        "uart_print_u64_rec:",
+        "    BL   uart_udivmod10_u64",
+        "    MOV  r4, r2",
+        "    MOV  r5, r0",
+        "    MOV  r6, r1",
+        "    MOV  r0, r5",
+        "    MOV  r1, r6",
+        "    BL   uart_print_u64",
+        "    MOV  r0, r4",
+        "    ADD  r0, r0, #'0'",
+        "    BL   uart_putc",
+        "    POP  {r4, r5, r6, r7, lr}",
+        "    BX   lr",
+        "uart_print_u64_digit:",
+        "    ADD  r0, r0, #'0'",
+        "    BL   uart_putc",
+        "    POP  {r4, r5, r6, r7, lr}",
+        "    BX   lr",
+        "",
+        "uart_print_int64:",
+        "    PUSH {r4, r5, r6, r7, lr}",
+        "    MOV  r4, r0",
+        "    MOV  r5, r1",
+        "    CMP  r5, #0",
+        "    BGE  uart_print_int64_pos",
+        "    MOV  r0, #'-'",
+        "    BL   uart_putc",
+        "    RSBS r4, r4, #0",
+        "    RSC  r5, r5, #0",
+        "uart_print_int64_pos:",
+        "    MOV  r0, r4",
+        "    MOV  r1, r5",
+        "    BL   uart_print_u64",
+        "    POP  {r4, r5, r6, r7, lr}",
+        "    BX   lr",
+        "",
+        "uart_print_int:",
+        "    ASR  r1, r0, #31",
+        "    B    uart_print_int64",
+        "",
+        "uart_print_float1:",
+        "    PUSH {r4, r5, r6, r7, lr}",
+        "    VCMP.F64    d0, #0",
+        "    VMRS        APSR_nzcv, FPSCR",
+        "    MOV         r4, #0",
+        "    BGE         uart_float_abs_ok",
+        "    MOV         r4, #1",
+        "    VNEG.F64    d0, d0",
+        "uart_float_abs_ok:",
+        "    LDR         r5, =UART_FLOAT10",
+        "    VLDR        d1, [r5]",
+        "    VMUL.F64    d0, d0, d1",
+        "    LDR         r5, =UART_HALF",
+        "    VLDR        d1, [r5]",
+        "    VADD.F64    d0, d0, d1",
+        "    VCVT.S32.F64 s0, d0",
+        "    VMOV        r0, s0",
+        "    MOV         r1, #0",
+        "    BL          uart_udivmod10_u64",
+        "    MOV         r5, r0",
+        "    MOV         r6, r1",
+        "    MOV         r7, r2",
+        "    CMP         r4, #0",
+        "    BEQ         uart_float_print_num",
+        "    MOV         r0, #'-'",
+        "    BL          uart_putc",
+        "uart_float_print_num:",
+        "    MOV         r0, r5",
+        "    MOV         r1, r6",
+        "    BL          uart_print_u64",
+        "    MOV         r0, #'.'",
+        "    BL          uart_putc",
+        "    ADD         r0, r7, #'0'",
+        "    BL          uart_putc",
+        "    POP         {r4, r5, r6, r7, lr}",
+        "    BX          lr",
+        "",
         "@ -------- função auxiliar --------",
         "digit_to_7seg:",
         "    PUSH {r1, lr}",
         "    LDR  r1, =SEG7_TABLE",
         "    LDRB r0, [r1, r0]",
         "    POP  {r1, lr}",
-        "    BX   lr",
-    ]
-
+        "    BX   lr",]
+    
     return "\n".join(partes)
+
 
 def exibirResultados(resultados):
     for linha in range(len(resultados)):
