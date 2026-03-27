@@ -724,8 +724,8 @@ def main():
     linhas_expressoes = lerArquivo(nomeArquivo=nome_arquivo)
     for linha in linhas_expressoes:
         token_linha.append(parseExpressao(linha=linha, tokens=[]))
-    salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte='teste_1.txt', nome_arquivo_saida='resultados/tokens.json')
-    salvar_assembly(gerarAssemblySequencia(token_linha, halt_entre_blocos= True), "resultados/arquivo.s", token_linha)
+    salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte='teste_1.txt', nome_arquivo_saida='resultados/tokens_saida.json')
+    salvar_assembly(gerarAssemblySequencia(token_linha, halt_entre_blocos= True), "resultados/assembly.s", token_linha)
     resultados = (executarExpressao(tokens_lista=token_linha, resultados=[], memoria={}))
     exibirResultados(resultados=resultados)
     print("Expressão finalizada")
