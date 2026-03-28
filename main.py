@@ -274,15 +274,15 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
 
     def load_res(n):
         history = estado.history
-
         if n >= len(history):
             raise RuntimeError(f"RES({n}): histórico insuficiente.")
-
-        past = history[n]
+        past = history[-1-n]
+        print(past)
 
         if "reg" in past:
             if past["kind"] == "float":
                 d = dreg()
+                print(d)
                 emit(f"    VMOV    {d}, {past['reg']}")
                 stack.append({"reg": d, "kind": "float"})
             else:
@@ -295,14 +295,14 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
             d = dreg()
             r = ireg()
 
-            emit(f"    LDR     {r}, ={lbl}")
-            emit(f"    VLDR    {d}, [{r}]")
 
             free_ireg(r)
 
             if past["kind"] == "float":
+                emit(f"    VLDR    {d}, [{r}]")
                 stack.append({"reg": d, "kind": "float"})
             else:
+                emit(f"    LDR     {r}, ={lbl}")
                 r2 = ireg()
                 double_to_int(d, r2)
                 stack.append({"reg": r2, "kind": "int"})
