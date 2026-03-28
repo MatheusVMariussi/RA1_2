@@ -4,7 +4,6 @@
 # - Jorge Samuel Teixeira Jordão, JorgeSTJordao
 # - Matheus Vinius Mariussi, MatheusVMariussi
 # - Pedro Henrique Vargas Navarro, Navarro45
-# - Nome do Aluno 4, Nome do github 4
 
 import sys
 from testesAnalisadorLexico import testar_analisador_lexico
@@ -274,15 +273,16 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
 
     def load_res(n):
         history = estado.history
-        if n >= len(history):
+        idx = n-1
+
+        if idx < 0 or idx >= len(history):
             raise RuntimeError(f"RES({n}): histórico insuficiente.")
-        past = history[-1-n]
-        print(past)
+
+        past = history[idx]
 
         if "reg" in past:
             if past["kind"] == "float":
                 d = dreg()
-                print(d)
                 emit(f"    VMOV    {d}, {past['reg']}")
                 stack.append({"reg": d, "kind": "float"})
             else:
@@ -295,14 +295,14 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
             d = dreg()
             r = ireg()
 
+            emit(f"    LDR     {r}, ={lbl}")
+            emit(f"    VLDR    {d}, [{r}]")
 
             free_ireg(r)
 
             if past["kind"] == "float":
-                emit(f"    VLDR    {d}, [{r}]")
                 stack.append({"reg": d, "kind": "float"})
             else:
-                emit(f"    LDR     {r}, ={lbl}")
                 r2 = ireg()
                 double_to_int(d, r2)
                 stack.append({"reg": r2, "kind": "int"})
@@ -319,7 +319,6 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         emit(f"    {instr}  {d}, {a['reg']}, {b['reg']}")
         result = {"reg": d, "kind": "float"}
         stack.append(result)
-        estado.history.insert(0, result)
 
     def pow_op():
         if len(stack) < 2:
@@ -350,7 +349,6 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         emit(f"{end}:")
         result = {"reg": d, "kind": "float"}
         stack.append(result)
-        estado.history.insert(0, result)
 
     def int_op(op):
         if len(stack) < 2:
@@ -365,7 +363,6 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         if op == "//":
             result = {"reg": rq, "kind": "int"}
             stack.append(result)
-            estado.history.insert(0, result)
         else:
             dq_clean = dreg()
             note("módulo: reconverte quociente truncado → double")
@@ -379,7 +376,6 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
             double_to_int(dresto, rresto)
             result = {"reg": rresto, "kind": "int"}
             stack.append(result)
-            estado.history.insert(0, result)
 
 
 
@@ -432,7 +428,6 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
                 raise ValueError("RES precisa ser precedido de um número inteiro.")
             stack.pop()
             estado.dreg_n -= 1
-            estado.ireg_n -= 1
             load_res(int(float(tokens[i - 1])))
             i += 1
 
@@ -444,7 +439,6 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
             )
             if stack and prev_is_value:
                 store_mem(tok)
-                estado.history.insert(0, stack[-1])
             else:
                 load_mem(tok)
             i += 1
@@ -457,15 +451,14 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
 
     final   = stack[-1]
 
-    emit("")
-    emit_seven_seg(final)
-
     # Persiste resultado final em slot de memória (para RES entre blocos)
+    # antes do print, para não salvar registradores já sobrescritos pela UART.
     slot_lbl = new_label("_RES_SLOT_")
     estado.data.append("")
     estado.data.append(f"@ slot de persistência — expressão '{' '.join(tokens)}'")
     estado.data.append(f"{slot_lbl}:  .double 0.0")
 
+    emit("")
     note(f"persiste resultado final em {slot_lbl}")
     r_slot = ireg()
     emit(f"    LDR     {r_slot}, ={slot_lbl}")
@@ -475,6 +468,9 @@ def _compilar_bloco(tokens: list[str], estado: _Estado) -> tuple[list[str], dict
         emit(f"    VMOV         s28, {final['reg']}")
         emit(f"    VCVT.F64.S32 d14, s28")
         emit(f"    VSTR         d14, [{r_slot}]")
+
+    emit("")
+    emit_seven_seg(final)
 
     # Atualiza history: entrada sem "reg" (só label) para que o próximo
     # bloco saiba que precisa recarregar da memória

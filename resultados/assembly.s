@@ -3,7 +3,7 @@
 @   [0] 1 3 * 15 2 + 4 - /
 @   [1] 3 2 //
 @   [2] 12 2 ^ 15 10 - //
-@   [3] 1 RES
+@   [3] 3 RES
 @   [4] MEM
 @   [5] 78 45 12 / +
 @   [6] MEM
@@ -32,7 +32,7 @@ C11:  .double 10
 @ slot de persistência — expressão '12 2 ^ 15 10 - //'
 _RES_SLOT_12:  .double 0.0
 
-@ slot de persistência — expressão '1 RES'
+@ slot de persistência — expressão '3 RES'
 _RES_SLOT_13:  .double 0.0
 MEM_MEM:  .double 0.0  @ variável MEM
 
@@ -97,14 +97,15 @@ _start:
     @ d2 / d7 → d8
     VDIV.F64  d8, d2, d7
 
+    @ persiste resultado final em _RES_SLOT_5
+    LDR     r0, =_RES_SLOT_5
+    VSTR    d8, [r0]
+
     @ === JTAG UART output ===
     VMOV.F64    d0, d8
     BL          uart_print_float1
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_5
-    LDR     r0, =_RES_SLOT_5
-    VSTR    d8, [r0]
     BKPT    #0   @ pausa — fim do bloco 0 (Continue no CPUlator para prosseguir)
 
     @ --- bloco 1: 3 2 // ---
@@ -121,17 +122,18 @@ _start:
     VCVT.S32.F64 s28, d30
     VMOV         r0, s28
 
+    @ persiste resultado final em _RES_SLOT_6
+    LDR     r1, =_RES_SLOT_6
+    VMOV         s28, r0
+    VCVT.F64.S32 d14, s28
+    VSTR         d14, [r1]
+
     @ === JTAG UART output ===
     MOV         r0, r0
     ASR         r1, r0, #31
     BL          uart_print_int64
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_6
-    LDR     r1, =_RES_SLOT_6
-    VMOV         s28, r0
-    VCVT.F64.S32 d14, s28
-    VSTR         d14, [r1]
     BKPT    #0   @ pausa — fim do bloco 1 (Continue no CPUlator para prosseguir)
 
     @ --- bloco 2: 12 2 ^ 15 10 - // ---
@@ -171,33 +173,36 @@ POW_END10:
     VCVT.S32.F64 s28, d30
     VMOV         r3, s28
 
+    @ persiste resultado final em _RES_SLOT_12
+    LDR     r4, =_RES_SLOT_12
+    VMOV         s28, r3
+    VCVT.F64.S32 d14, s28
+    VSTR         d14, [r4]
+
     @ === JTAG UART output ===
     MOV         r0, r3
     ASR         r1, r0, #31
     BL          uart_print_int64
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_12
-    LDR     r4, =_RES_SLOT_12
-    VMOV         s28, r3
-    VCVT.F64.S32 d14, s28
-    VSTR         d14, [r4]
     BKPT    #0   @ pausa — fim do bloco 2 (Continue no CPUlator para prosseguir)
 
-    @ --- bloco 3: 1 RES ---
-    @ carrega 1 → d0
-    LDR     r0, =C0
+    @ --- bloco 3: 3 RES ---
+    @ carrega 3 → d0
+    LDR     r0, =C1
     VLDR    d0, [r0]
-    VMOV    d0, d5
+    LDR     r0, =_RES_SLOT_5
+    VLDR    d0, [r0]
+
+    @ persiste resultado final em _RES_SLOT_13
+    LDR     r0, =_RES_SLOT_13
+    VSTR    d0, [r0]
 
     @ === JTAG UART output ===
     VMOV.F64    d0, d0
     BL          uart_print_float1
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_13
-    LDR     r0, =_RES_SLOT_13
-    VSTR    d0, [r0]
     BKPT    #0   @ pausa — fim do bloco 3 (Continue no CPUlator para prosseguir)
 
     @ --- bloco 4: MEM ---
@@ -205,14 +210,15 @@ POW_END10:
     LDR     r0, =MEM_MEM
     VLDR    d0, [r0]
 
+    @ persiste resultado final em _RES_SLOT_14
+    LDR     r0, =_RES_SLOT_14
+    VSTR    d0, [r0]
+
     @ === JTAG UART output ===
     VMOV.F64    d0, d0
     BL          uart_print_float1
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_14
-    LDR     r0, =_RES_SLOT_14
-    VSTR    d0, [r0]
     BKPT    #0   @ pausa — fim do bloco 4 (Continue no CPUlator para prosseguir)
 
     @ --- bloco 5: 78 45 12 / + ---
@@ -230,14 +236,15 @@ POW_END10:
     @ d0 + d3 → d4
     VADD.F64  d4, d0, d3
 
+    @ persiste resultado final em _RES_SLOT_17
+    LDR     r0, =_RES_SLOT_17
+    VSTR    d4, [r0]
+
     @ === JTAG UART output ===
     VMOV.F64    d0, d4
     BL          uart_print_float1
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_17
-    LDR     r0, =_RES_SLOT_17
-    VSTR    d4, [r0]
     BKPT    #0   @ pausa — fim do bloco 5 (Continue no CPUlator para prosseguir)
 
     @ --- bloco 6: MEM ---
@@ -245,14 +252,15 @@ POW_END10:
     LDR     r0, =MEM_MEM
     VLDR    d0, [r0]
 
+    @ persiste resultado final em _RES_SLOT_18
+    LDR     r0, =_RES_SLOT_18
+    VSTR    d0, [r0]
+
     @ === JTAG UART output ===
     VMOV.F64    d0, d0
     BL          uart_print_float1
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_18
-    LDR     r0, =_RES_SLOT_18
-    VSTR    d0, [r0]
     BKPT    #0   @ pausa — fim do bloco 6 (Continue no CPUlator para prosseguir)
 
     @ --- bloco 7: 4 5 ^ 7 7 2 / - - 7 * 2 * MEM ---
@@ -306,14 +314,15 @@ POW_END21:
     LDR     r3, =MEM_MEM
     VSTR    d12, [r3]
 
+    @ persiste resultado final em _RES_SLOT_23
+    LDR     r3, =_RES_SLOT_23
+    VSTR    d12, [r3]
+
     @ === JTAG UART output ===
     VMOV.F64    d0, d12
     BL          uart_print_float1
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_23
-    LDR     r3, =_RES_SLOT_23
-    VSTR    d12, [r3]
     BKPT    #0   @ pausa — fim do bloco 7 (Continue no CPUlator para prosseguir)
 
     @ --- bloco 8: 15 6 % ---
@@ -339,17 +348,18 @@ POW_END21:
     VCVT.S32.F64 s28, d30
     VMOV         r1, s28
 
+    @ persiste resultado final em _RES_SLOT_25
+    LDR     r2, =_RES_SLOT_25
+    VMOV         s28, r1
+    VCVT.F64.S32 d14, s28
+    VSTR         d14, [r2]
+
     @ === JTAG UART output ===
     MOV         r0, r1
     ASR         r1, r0, #31
     BL          uart_print_int64
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_25
-    LDR     r2, =_RES_SLOT_25
-    VMOV         s28, r1
-    VCVT.F64.S32 d14, s28
-    VSTR         d14, [r2]
     BKPT    #0   @ pausa — fim do bloco 8 (Continue no CPUlator para prosseguir)
 
     @ --- bloco 9: MEM ---
@@ -357,14 +367,15 @@ POW_END21:
     LDR     r0, =MEM_MEM
     VLDR    d0, [r0]
 
+    @ persiste resultado final em _RES_SLOT_26
+    LDR     r0, =_RES_SLOT_26
+    VSTR    d0, [r0]
+
     @ === JTAG UART output ===
     VMOV.F64    d0, d0
     BL          uart_print_float1
     MOV         r0, #10
     BL          uart_putc
-    @ persiste resultado final em _RES_SLOT_26
-    LDR     r0, =_RES_SLOT_26
-    VSTR    d0, [r0]
 
     B   .   @ halt
 
