@@ -55,10 +55,10 @@ def executarExpressao(tokens_lista, resultados, memoria):
             elif token.tipo == 'MEM_NAME':
                 nome = token.valor
                 if pilha:
-                    memoria = pilha.pop()
-                    pilha.append(memoria)
-                elif memoria != None:
-                    pilha.append(memoria)
+                    memoria[nome] = pilha.pop()
+                    pilha.append(memoria[nome])
+                elif nome in memoria:
+                    pilha.append(memoria[nome])
                 else:
                     pilha.append(0.0)
         resultado = pilha[-1] if pilha else None
@@ -78,69 +78,70 @@ def testar_executar_expressao():
     resultados = []
 
     # Teste 1: Soma simples
-    tokens = parse("(3.0 2.0 +)")
+    tokens = [parse("(3.0 2.0 +)")]
     res = executarExpressao(tokens, resultados, memoria)
-    assert res == 5.0
+    print(res)
+    assert  5.0 in res
     print("Teste executarExpressao 1 OK: soma simples")
 
     # Teste 2: Potenciação
-    tokens = parse("(2 3 ^)")
+    tokens = [parse("(2 3 ^)")]
     res = executarExpressao(tokens, resultados, memoria)
-    assert res == 8.0
+    assert 8.0 in res
     print("Teste executarExpressao 2 OK: potenciação")
 
     # Teste 3: Divisão inteira e resto
-    tokens = parse("(10 3 //)")
+    tokens = [parse("(10 3 //)")]
     res = executarExpressao(tokens, resultados, memoria)
-    assert res == 3
-    tokens = parse("(10 3 %)")
+    assert 3 in res
+    tokens = [parse("(10 3 %)")]
     res = executarExpressao(tokens, resultados, memoria)
-    assert res == 1
+    assert 1 in res
     print("Teste executarExpressao 3 OK: divisão inteira e resto")
 
 
     # Teste 4: Armazenar e ler memória (válido)
     # Primeiro armazena, depois lê
-    tokens = parse("(10.5 CONTADOR)")
+    tokens = [parse("(10.5 CONTADOR)")]
     executarExpressao(tokens, resultados, memoria)
     assert memoria["CONTADOR"] == 10.5
-    tokens = parse("(CONTADOR)")
+    tokens = [parse("(CONTADOR)")]
     res = executarExpressao(tokens, resultados, memoria)
-    assert res == 10.5
+    assert 10.5 in res
     print("Teste executarExpressao 4 OK: memória criada e lida")
 
     # Teste 5: Sobrescrever variável
-    tokens = parse("(20 CONTADOR)")
+    tokens = [parse("(20 CONTADOR)")]
     executarExpressao(tokens, resultados, memoria)
     assert memoria["CONTADOR"] == 20.0
-    tokens = parse("(CONTADOR)")
+    tokens = [parse("(CONTADOR)")]
     res = executarExpressao(tokens, resultados, memoria)
-    assert res == 20.0
+    assert 20.0 in res
     print("Teste executarExpressao 5 OK: sobrescrita de variável")
 
     # Teste 6: Múltiplas variáveis
-    tokens = parse("(7 X)")
+    tokens = [parse("(7 X)")]
     executarExpressao(tokens, resultados, memoria)
-    tokens = parse("(3 Y)")
+    tokens = [parse("(3 Y)")]
     executarExpressao(tokens, resultados, memoria)
     assert memoria["X"] == 7.0
     assert memoria["Y"] == 3.0
-    tokens = parse("(X)")
+    tokens = [parse("(X)")]
     res = executarExpressao(tokens, resultados, memoria)
     assert res == 7.0
-    tokens = parse("(Y)")
+    tokens = [parse("(Y)")]
     res = executarExpressao(tokens, resultados, memoria)
     assert res == 3.0
     print("Teste executarExpressao 6 OK: múltiplas variáveis")
 
     # Teste 5: Histórico de resultados
-    tokens = parse("(5 RES)")
+    tokens = [parse("(5 RES)")]
     executarExpressao(tokens, resultados, memoria)
     assert resultados[-1] == 5.0
     print("Teste executarExpressao 5 OK: histórico de resultados")
 
     # Teste 7: Expressão aninhada — (3.0 * 4.0) / (2.0 + 1.0) = 12.0 / 3.0 = 4.0
-    tokens = parse("((3.0 4.0 *) (2.0 1.0 +) /)")
+    tokens = [parse("((3.0 4.0 *) (2.0 1.0 +) /)")]
     res = executarExpressao(tokens, resultados, memoria)
     assert res == 4.0
     print("Teste executarExpressao 7 OK: expressão aninhada")

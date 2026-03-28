@@ -902,7 +902,7 @@ def main():
         token_linha.append(token_parsed)
     salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte=nome_arquivo, nome_arquivo_saida='resultados/tokens_saida.json')
     salvar_assembly(gerarAssemblySequencia(token_linha, halt_entre_blocos= True), "resultados/assembly.s", token_linha)
-    resultados = (executarExpressao(tokens_lista=token_linha, resultados=[], memoria=None))
+    resultados = (executarExpressao(tokens_lista=token_linha, resultados=[], memoria={}))
     exibirResultados(resultados=resultados)
     print("Expressão finalizada")
 
