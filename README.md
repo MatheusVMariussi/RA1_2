@@ -9,9 +9,9 @@
 
 Gabriel Augusto Martins de Araujo | Gabriel_AMA
 
-Matheus Vinicius Mariussi | MatheusVMariussi
-
 Jorge Samuel Teixeira Jordão | JorgeSTJordao
+
+Matheus Vinicius Mariussi | MatheusVMariussi
 
 Pedro Henrique Vargas Navarro | Navarro45
 
