@@ -7,7 +7,6 @@ def estadoErro(c, buffer, tokens):
     buffer.clear()
     return None
 
-
 def q0_inicio(c, buffer, tokens):
     # Estado inicial
     # Decide para qual estado transitar baseado no caractere atual

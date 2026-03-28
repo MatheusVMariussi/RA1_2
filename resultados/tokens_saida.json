@@ -107,44 +107,6 @@
           "valor": "("
         },
         {
-          "tipo": "NUMBER",
-          "valor": "2"
-        },
-        {
-          "tipo": "MEM_NAME",
-          "valor": "MEM"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        }
-      ]
-    },
-    {
-      "linha": 4,
-      "tokens": [
-        {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
-          "tipo": "MEM_NAME",
-          "valor": "MEM"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        }
-      ]
-    },
-    {
-      "linha": 5,
-      "tokens": [
-        {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
           "tipo": "LPAREN",
           "valor": "("
         },
@@ -195,7 +157,7 @@
       ]
     },
     {
-      "linha": 6,
+      "linha": 4,
       "tokens": [
         {
           "tipo": "LPAREN",
@@ -203,7 +165,7 @@
         },
         {
           "tipo": "NUMBER",
-          "valor": "2"
+          "valor": "3"
         },
         {
           "tipo": "KEYWORD_RES",
@@ -216,7 +178,24 @@
       ]
     },
     {
-      "linha": 7,
+      "linha": 5,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "MEM_NAME",
+          "valor": "MEM"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    },
+    {
+      "linha": 6,
       "tokens": [
         {
           "tipo": "LPAREN",
@@ -249,6 +228,23 @@
         {
           "tipo": "OP_ADD",
           "valor": "+"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    },
+    {
+      "linha": 7,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "MEM_NAME",
+          "valor": "MEM"
         },
         {
           "tipo": "RPAREN",
@@ -373,8 +369,16 @@
           "valor": "("
         },
         {
-          "tipo": "MEM_NAME",
-          "valor": "MEM"
+          "tipo": "NUMBER",
+          "valor": "15"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "6"
+        },
+        {
+          "tipo": "OP_MOD",
+          "valor": "%"
         },
         {
           "tipo": "RPAREN",
@@ -390,16 +394,8 @@
           "valor": "("
         },
         {
-          "tipo": "NUMBER",
-          "valor": "5"
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "8"
-        },
-        {
-          "tipo": "OP_SUB",
-          "valor": "-"
+          "tipo": "MEM_NAME",
+          "valor": "MEM"
         },
         {
           "tipo": "RPAREN",

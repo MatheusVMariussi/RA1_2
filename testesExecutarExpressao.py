@@ -3,21 +3,25 @@ from maquinaDeEstados import parseExpressao
 
 def executarExpressao(tokens_lista, resultados, memoria):
     # Avalia a expressão RPN representada por tokens
-    pilha = []
 
     for tokens in tokens_lista:
+        pilha = []
         for token in tokens:
             if token.tipo == 'NUMBER':
                 pilha.append(float(token.valor))
 
-            elif token.tipo == 'MEM':
-                nome = token.valor
-                if pilha:
-                    memoria[nome] = pilha.pop()
-                elif nome in memoria:
-                    pilha.append(memoria[nome])
-                else:
-                    raise ValueError(f"Variável '{nome}' não encontrada.")
+            elif token.tipo == 'KEYWORD_RES':
+                # (N RES) : Retorna o resultado da expressão N linhas anteriores
+                # N deve estar no topo da pilha
+                n = int(pilha.pop())
+                if n < 0:
+                    raise ValueError(f"Índice RES negativo: {n}")
+                if n == 0 or n > len(resultados):
+                    raise ValueError(f"Índice RES inválido: {n} (apenas {len(resultados)} resultados disponíveis)")
+                # N=1 significa o resultado mais recente, N=2 o penúltimo, etc.
+                resultado_anterior = resultados[-n]
+                pilha.append(resultado_anterior)
+
 
             elif token.tipo in ('OP_ADD', 'OP_SUB', 'OP_MUL', 'OP_DIV',
                                 'OP_INTDIV', 'OP_MOD', 'OP_POW'):
@@ -48,7 +52,16 @@ def executarExpressao(tokens_lista, resultados, memoria):
                     pilha.append(int(a % b))
                 elif token.tipo == 'OP_POW':
                     pilha.append(a ** b)
-        resultado = pilha[-1] if pilha else 0.0
+            elif token.tipo == 'MEM_NAME':
+                nome = token.valor
+                if pilha:
+                    memoria = pilha.pop()
+                    pilha.append(memoria)
+                elif memoria != None:
+                    pilha.append(memoria)
+                else:
+                    pilha.append(0.0)
+        resultado = pilha[-1] if pilha else None
         resultados.append(resultado)
 
     return resultados
