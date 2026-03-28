@@ -1,5 +1,6 @@
 # Trabalho RA1, Grupo 2
 # Alunos: (Deixar em ordem alfabética)
+# - Gabriel Augusto Martins de Araujo, Gabriel_AMA
 # - Jorge Samuel Teixeira Jordão, JorgeSTJordao
 # - Matheus Vinius Mariussi, MatheusVMariussi
 # - Pedro Henrique Vargas Navarro, Navarro45
@@ -866,7 +867,10 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
 
 def exibirResultados(resultados):
     for linha in range(len(resultados)):
-        print(f"O resultado da expressão na linha {linha+1} é {resultados[linha]}!")
+        if(resultados[linha]!=None):
+            print(f"O resultado da expressão na linha {linha+1} é {resultados[linha]}!")
+        else:
+            print(f"O resultado da expressão na linha {linha+1} é None!")
 
 def salvar_assembly(assembly, caminho, tokens):
     with open(caminho, "w", encoding="utf-8") as f:
@@ -896,10 +900,13 @@ def main():
     print(f"Arquivo: {nome_arquivo}")
     linhas_expressoes = lerArquivo(nomeArquivo=nome_arquivo)
     for linha in linhas_expressoes:
-        token_linha.append(parseExpressao(linha=linha, tokens=[]))
+        token_parsed = parseExpressao(linha=linha, tokens=[])
+        if(token_parsed==False):
+            raise ValueError(f"Erro léxico com a linha {linha}")
+        token_linha.append(token_parsed)
     salvar_tokens(todas_linhas_tokens=token_linha, nome_arquivo_fonte='teste_1.txt', nome_arquivo_saida='resultados/tokens_saida.json')
     salvar_assembly(gerarAssemblySequencia(token_linha, halt_entre_blocos= True), "resultados/assembly.s", token_linha)
-    resultados = (executarExpressao(tokens_lista=token_linha, resultados=[], memoria={}))
+    resultados = (executarExpressao(tokens_lista=token_linha, resultados=[], memoria=None))
     exibirResultados(resultados=resultados)
     print("Expressão finalizada")
 

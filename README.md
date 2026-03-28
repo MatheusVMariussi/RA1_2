@@ -8,8 +8,11 @@
 **Integrantes: (Nome | Github)**
 
 Gabriel Augusto Martins de Araujo | Gabriel_AMA
+
 Matheus Vinicius Mariussi | MatheusVMariussi
+
 Jorge Samuel Teixeira Jordão | JorgeSTJordao
+
 Pedro Henrique Vargas Navarro | Navarro45
 
 # Instruções de compilação, execução e testes
@@ -24,20 +27,20 @@ python main.py --test
 ### Checklist Final de Entrega
 
 ```
-[ ] Código fonte (Python) com nomes e grupo nas primeiras linhas
-[ ] Funções com nomes obrigatórios:
-    [ ] parseExpressao
-    [ ] executarExpressao
-    [ ] gerarAssembly
-    [ ] exibirResultados
-    [ ] lerArquivo
-[ ] Analisador léxico com DFA (estados como funções, SEM regex)
-[ ] 3 arquivos de teste com 10+ linhas cada, usando TODOS os operadores
-[ ] Funções de teste do analisador léxico
-[ ] Arquivo tokens_saida.json com tokens da última execução
-[ ] Arquivo .s com Assembly ARMv7 funcional da última execução
-[ ] Assembly testado e funcionando no CPUlator DE1-SoC
-[ ] README.md com: instituição, disciplina, professor, nomes (alfabético + GitHub)
-[ ] Repositório com commits claros e pull requests
-[ ] Execução: python programa.py teste1.txt
+[x] Código fonte (Python) com nomes e grupo nas primeiras linhas
+[x] Funções com nomes obrigatórios:
+    [x] parseExpressao
+    [x] executarExpressao
+    [x] gerarAssembly
+    [x] exibirResultados
+    [x] lerArquivo
+[x] Analisador léxico com DFA (estados como funções, SEM regex)
+[x] 3 arquivos de teste com 10+ linhas cada, usando TODOS os operadores
+[x] Funções de teste do analisador léxico
+[x] Arquivo tokens_saida.json com tokens da última execução
+[x] Arquivo .s com Assembly ARMv7 funcional da última execução
+[x] Assembly testado e funcionando no CPUlator DE1-SoC
+[x] README.md com: instituição, disciplina, professor, nomes (alfabético + GitHub)
+[x] Repositório com commits claros e pull requests
+[x] Execução: python programa.py teste1.txt
 ```
