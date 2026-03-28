@@ -14,11 +14,11 @@
         },
         {
           "tipo": "NUMBER",
-          "valor": "1"
+          "valor": "2"
         },
         {
           "tipo": "NUMBER",
-          "valor": "3"
+          "valor": "5"
         },
         {
           "tipo": "OP_MUL",
@@ -33,40 +33,24 @@
           "valor": "("
         },
         {
-          "tipo": "LPAREN",
-          "valor": "("
+          "tipo": "NUMBER",
+          "valor": "18"
         },
         {
           "tipo": "NUMBER",
-          "valor": "15"
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "2"
-        },
-        {
-          "tipo": "OP_ADD",
-          "valor": "+"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "4"
-        },
-        {
-          "tipo": "OP_SUB",
-          "valor": "-"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
+          "valor": "3"
         },
         {
           "tipo": "OP_DIV",
           "valor": "/"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "OP_ADD",
+          "valor": "+"
         },
         {
           "tipo": "RPAREN",
@@ -83,15 +67,15 @@
         },
         {
           "tipo": "NUMBER",
-          "valor": "3"
+          "valor": "4"
         },
         {
           "tipo": "NUMBER",
-          "valor": "2"
+          "valor": "3"
         },
         {
-          "tipo": "OP_INTDIV",
-          "valor": "//"
+          "tipo": "OP_POW",
+          "valor": "^"
         },
         {
           "tipo": "RPAREN",
@@ -101,84 +85,6 @@
     },
     {
       "linha": 3,
-      "tokens": [
-        {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "12"
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "2"
-        },
-        {
-          "tipo": "OP_POW",
-          "valor": "^"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        },
-        {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "15"
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "10"
-        },
-        {
-          "tipo": "OP_SUB",
-          "valor": "-"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        },
-        {
-          "tipo": "OP_INTDIV",
-          "valor": "//"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        }
-      ]
-    },
-    {
-      "linha": 4,
-      "tokens": [
-        {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "3"
-        },
-        {
-          "tipo": "KEYWORD_RES",
-          "valor": "RES"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        }
-      ]
-    },
-    {
-      "linha": 5,
       "tokens": [
         {
           "tipo": "LPAREN",
@@ -195,15 +101,31 @@
       ]
     },
     {
-      "linha": 6,
+      "linha": 4,
       "tokens": [
         {
           "tipo": "LPAREN",
           "valor": "("
         },
         {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "MEM_NAME",
+          "valor": "MEM"
+        },
+        {
           "tipo": "NUMBER",
-          "valor": "78"
+          "valor": "6"
+        },
+        {
+          "tipo": "OP_ADD",
+          "valor": "+"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
         },
         {
           "tipo": "LPAREN",
@@ -211,11 +133,11 @@
         },
         {
           "tipo": "NUMBER",
-          "valor": "45"
+          "valor": "9"
         },
         {
           "tipo": "NUMBER",
-          "valor": "12"
+          "valor": "3"
         },
         {
           "tipo": "OP_DIV",
@@ -226,8 +148,90 @@
           "valor": ")"
         },
         {
-          "tipo": "OP_ADD",
-          "valor": "+"
+          "tipo": "OP_MUL",
+          "valor": "*"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    },
+    {
+      "linha": 5,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "7"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "2"
+        },
+        {
+          "tipo": "OP_INTDIV",
+          "valor": "//"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        }
+      ]
+    },
+    {
+      "linha": 6,
+      "tokens": [
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "14"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "2"
+        },
+        {
+          "tipo": "OP_MUL",
+          "valor": "*"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "8"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "3"
+        },
+        {
+          "tipo": "OP_SUB",
+          "valor": "-"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "OP_DIV",
+          "valor": "/"
         },
         {
           "tipo": "RPAREN",
@@ -264,12 +268,8 @@
           "valor": "("
         },
         {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
           "tipo": "NUMBER",
-          "valor": "4"
+          "valor": "5"
         },
         {
           "tipo": "NUMBER",
@@ -289,23 +289,15 @@
         },
         {
           "tipo": "NUMBER",
-          "valor": "7"
-        },
-        {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "7"
-        },
-        {
-          "tipo": "NUMBER",
           "valor": "2"
         },
         {
-          "tipo": "OP_DIV",
-          "valor": "/"
+          "tipo": "NUMBER",
+          "valor": "10"
+        },
+        {
+          "tipo": "OP_ADD",
+          "valor": "+"
         },
         {
           "tipo": "RPAREN",
@@ -314,46 +306,6 @@
         {
           "tipo": "OP_SUB",
           "valor": "-"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        },
-        {
-          "tipo": "OP_SUB",
-          "valor": "-"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        },
-        {
-          "tipo": "LPAREN",
-          "valor": "("
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "7"
-        },
-        {
-          "tipo": "OP_MUL",
-          "valor": "*"
-        },
-        {
-          "tipo": "NUMBER",
-          "valor": "2"
-        },
-        {
-          "tipo": "RPAREN",
-          "valor": ")"
-        },
-        {
-          "tipo": "OP_MUL",
-          "valor": "*"
-        },
-        {
-          "tipo": "MEM_NAME",
-          "valor": "MEM"
         },
         {
           "tipo": "RPAREN",
@@ -370,15 +322,11 @@
         },
         {
           "tipo": "NUMBER",
-          "valor": "15"
-        },
-        {
-          "tipo": "NUMBER",
           "valor": "6"
         },
         {
-          "tipo": "OP_MOD",
-          "valor": "%"
+          "tipo": "KEYWORD_RES",
+          "valor": "RES"
         },
         {
           "tipo": "RPAREN",
@@ -394,8 +342,48 @@
           "valor": "("
         },
         {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
           "tipo": "MEM_NAME",
           "valor": "MEM"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "2"
+        },
+        {
+          "tipo": "OP_POW",
+          "valor": "^"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "LPAREN",
+          "valor": "("
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "6"
+        },
+        {
+          "tipo": "NUMBER",
+          "valor": "4"
+        },
+        {
+          "tipo": "OP_MOD",
+          "valor": "%"
+        },
+        {
+          "tipo": "RPAREN",
+          "valor": ")"
+        },
+        {
+          "tipo": "OP_ADD",
+          "valor": "+"
         },
         {
           "tipo": "RPAREN",

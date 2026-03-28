@@ -864,7 +864,7 @@ def gerarAssemblySequencia(lista_de_tokens: list[list],
 def exibirResultados(resultados):
     for linha in range(len(resultados)):
         if(resultados[linha]!=None):
-            print(f"O resultado da expressão na linha {linha+1} é {resultados[linha]}!")
+            print(f"O resultado da expressão na linha {linha+1} é {resultados[linha]:.1f}!")
         else:
             print(f"O resultado da expressão na linha {linha+1} é None!")
 
